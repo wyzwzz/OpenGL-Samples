@@ -192,7 +192,7 @@ class GLObject final{
   using Context= GLContext<GLContextImpl,GLAPILoaderImpl>;
   std::shared_ptr<Context> gl_context;
   uint32_t m_object = 0;
-
+  using Self = GLObject<GLContextImpl,GLAPILoaderImpl,type>;
   template <typename ,typename >
   friend class GLContext;
 
@@ -206,11 +206,15 @@ public:
   GLObject(const GLObject&) = delete;
   GLObject& operator=(const GLObject&) = delete;
 
-  GLObject(GLObject&& rhs) noexcept {
-
+  GLObject(GLObject&& rhs) noexcept
+  :m_object(rhs.m_object),gl_context(std::move(rhs.gl_context))
+  {
+        rhs.m_object = 0;
   }
   GLObject& operator=(GLObject&& rhs) noexcept{
-
+        Release();
+        new (this) Self(std::move(rhs));
+        return *this;
   }
 
   static constexpr GLObjectType GetType(){
@@ -313,7 +317,7 @@ public:
     return GLSampler(this->shared_from_this(),handle);
   }
   void DeleteGLObject(GLSampler& object){
-    GL_EXPR(glDelete(1,&object.m_object));
+    GL_EXPR(glDeleteSamplers(1,&object.m_object));
     object.gl_context = nullptr;
     object.m_object = 0;
   }

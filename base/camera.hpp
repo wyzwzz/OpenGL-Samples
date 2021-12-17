@@ -275,9 +275,9 @@ namespace control{
         glm::vec3 getCameraRight() const{
             return right;
         }
-    private:
         void updateVector();
-    private:
+
+      public:
         glm::vec3 pos,view_direction,up,right,world_up;
         float yaw,pitch,move_speed,move_sense,zoom;
         glm::vec3 space_ratio;

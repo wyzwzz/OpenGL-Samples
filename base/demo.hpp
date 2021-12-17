@@ -11,7 +11,7 @@ class Demo{
   protected:
     void initGL();
     virtual void initResource() {}
-    std::unique_ptr<control::Camera> camera;
+    std::unique_ptr<control::FPSCamera> camera;
     decltype(GL::New()) gl;
     int window_w,window_h;
   public:

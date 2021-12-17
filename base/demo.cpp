@@ -6,8 +6,11 @@
 void Demo::initGL()
 {
     gl=GL::New();
+
     window_w = gl->Width();
+
     window_h = gl->Height();
+
     GL::MouseEvent=[&]( void *, MouseButton buttons, EventAction action, int xpos, int ypos){
       static bool left_button_press;
       if(buttons==Mouse_Left && action == Press){
@@ -19,14 +22,14 @@ void Demo::initGL()
           camera->processMouseButton(control::CameraDefinedMouseButton::Left,false,xpos,ypos);
       }
       else if(action==Move && buttons==Mouse_Left && left_button_press){
-//            spdlog::info("mouse move {0} {1}",xpos,ypos);
           camera->processMouseMove(xpos,ypos);
       }
     };
+
     GL::ScrollEvent=[&](void*,int x,int y){
-//        spdlog::info("scroll y: {0}",y);
       camera->processMouseScroll(y);
     };
+
     GL::KeyboardEvent = [&]( void *, KeyButton key, EventAction action ){
       if(key==Key_Esc && action==Press){
           gl->Close();
@@ -44,9 +47,11 @@ void Demo::initGL()
       }
 
     };
+
     GL::FileDropEvent = [&]( void *, int count, const char **df ){
 
     };
+
     GL::FramebufferResizeEvent = []( void *, int width, int height ) {
       glBindFramebuffer(GL_FRAMEBUFFER,0);
       glViewport(0,0,width,height);

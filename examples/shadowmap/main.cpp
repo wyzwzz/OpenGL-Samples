@@ -3,8 +3,7 @@
 //
 #include <demo.hpp>
 #include <shader_program.hpp>
-class ShadowMapApplication : public Demo{
-  protected:
+class ShadowMapApplication final: public Demo{
     void initResource() override{
         glEnable(GL_DEPTH_TEST);
 
@@ -109,23 +108,27 @@ class ShadowMapApplication : public Demo{
         camera = std::make_unique<control::FPSCamera>(glm::vec3{0.f, 1.5f, 5.f});
 //        camera = std::make_unique<control::FPSCamera>(light.position);
     }
+    void render_frame() override ;
 
-  private:
-    std::vector<mesh_t> meshes;
   public:
     ShadowMapApplication() = default;
-    void render_frame() override ;
+
+  private:
     struct Light{
         vec3f position;
         vec3f direction;
         vec3f incidence;//color rgb
-    };
-  private:
-    Light light;
+    } light;
+
+    std::vector<mesh_t> meshes;
+
     std::unique_ptr<Shader> shadow_shader;
     std::unique_ptr<Shader> phong_shader;
+
     std::vector<uint32_t> mesh_vao,mesh_vbo,mesh_ebo;
+
     uint32_t shadow_fbo,shadow_rbo,shadow_tex;
+
     int shadow_w=4096,shadow_h=4096;
 };
 void ShadowMapApplication::render_frame()
