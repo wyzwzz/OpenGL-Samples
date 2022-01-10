@@ -9,3 +9,9 @@ target_link_libraries(
         spdlog::spdlog
         glm::glm
 )
+
+target_compile_features(
+        obj-viewer
+        PRIVATE
+        cxx_std_17
+)

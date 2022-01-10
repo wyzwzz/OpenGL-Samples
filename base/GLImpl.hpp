@@ -178,6 +178,9 @@ class GLFWImpl : public EventListenerTraits
     {
         return true;
     }
+    GLFWwindow* GetWindow(){
+        return window.get();
+    }
     bool Wait() const
     {
         return glfwWindowShouldClose(window.get());

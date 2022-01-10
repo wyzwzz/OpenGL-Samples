@@ -22,6 +22,12 @@ class Demo{
             while(!gl->Wait()){
 
                 render_frame();
+                
+                begin_imgui();
+
+                render_imgui();
+
+                end_imgui();
 
                 gl->Present();
                 gl->DispatchEvent();
@@ -37,5 +43,8 @@ class Demo{
         }
     }
     virtual void render_frame(){}
-
+    virtual void render_imgui(){}
+    private:
+    void begin_imgui();
+    void end_imgui();
 };

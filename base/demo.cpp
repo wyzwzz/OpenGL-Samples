@@ -2,10 +2,22 @@
 // Created by wyz on 2021/11/11.
 //
 #include "demo.hpp"
-
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+#include "logger.hpp"
 void Demo::initGL()
 {
     gl=GL::New();
+    {
+      IMGUI_CHECKVERSION();
+      ImGui::CreateContext();
+      ImGuiIO &io = ImGui::GetIO();
+
+      ImGui::StyleColorsDark();
+      ImGui_ImplGlfw_InitForOpenGL(gl->GetWindow(),true);
+      ImGui_ImplOpenGL3_Init();
+    }
 
     window_w = gl->Width();
 
@@ -61,4 +73,15 @@ void Demo::initGL()
 Demo::Demo()
 {
     initGL();
+}
+void Demo::begin_imgui(){
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void Demo::end_imgui(){
+    ImGui::EndFrame();
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
