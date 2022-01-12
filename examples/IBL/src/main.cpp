@@ -305,10 +305,17 @@ public:
         GL::GLTexture hdr;
         GL::GLTexture env_cube;
         static constexpr uint32_t CUBE_SIZE = 512;
-        std::unique_ptr<Shader> equirectangular2cubemap;
+        std::unique_ptr<Shader> equirectangular2cubemap_shader;
         GL::GLVertexArray vao;
         GL::GLBuffer vbo;
+        std::unique_ptr<Shader> skybox_shader;
     }cube_map;
+
+    struct{
+        GL::GLTexture irradiance_map;
+        std::unique_ptr<Shader> capture_irradiance_shader;
+    }ibl;
+
     void createHDRTexture(const std::string& path){
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
@@ -341,7 +348,23 @@ public:
             glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
             glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
         };
-        cube_map.equirectangular2cubemap->use();
+        cube_map.equirectangular2cubemap_shader->use();
+        cube_map.equirectangular2cubemap_shader->setInt("equirectangularMap",0);
+        cube_map.equirectangular2cubemap_shader->setMat4("projection",captureProj);
+        glBindTextureUnit(0,cube_map.hdr);
+        GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo));
+        glViewport(0,0,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE);
+        glBindVertexArray(cube_map.vao);
+        for(uint32_t i = 0;i < 6; i++){
+            cube_map.equirectangular2cubemap_shader->setMat4("view",captureView[i]);
+            GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,cube_map.env_cube,0));           
+            GL_EXPR(glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT));
+            GL_EXPR(glDrawArrays(GL_TRIANGLES,0,36));
+        }
+        glBindVertexArray(0);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        glViewport(0,0,gl->Width(),gl->Height());
+        GL_CHECK
     }
     void createEnvCubeMap(){
         CreateCube(gl,cube_map.vao,cube_map.vbo);
@@ -349,38 +372,67 @@ public:
         cube_map.rbo = gl->CreateRenderbuffer();
         glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo);
         glBindRenderbuffer(GL_RENDERBUFFER,cube_map.rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,cube_map.rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,cube_map.rbo);
+        if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){
+            throw std::runtime_error("Framebuffer object is not complete!");
+        }
         GL_CHECK
 
         createHDRTexture(TexturePath+"hdr/newport_loft.hdr");
 
         cube_map.env_cube = gl->CreateTexture(GL_TEXTURE_CUBE_MAP);
-        for(uint32_t i = 0;i < 6; i++)
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,
-            cube_map.CUBE_SIZE,cube_map.CUBE_SIZE,0,GL_RGB,GL_FLOAT,nullptr);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,cube_map.env_cube);
+        for(uint32_t i = 0;i < 6; i++){
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE,0,GL_RGB,GL_FLOAT,nullptr);
+        }
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        cube_map.equirectangular2cubemap = std::make_unique<Shader>(
+        GL_CHECK
+
+        cube_map.equirectangular2cubemap_shader = std::make_unique<Shader>(
             (ShaderPath+"cube_map_v.glsl").c_str(),
             (ShaderPath+"equirectangular2cubemap_f.glsl").c_str()
         );
 
+        glDepthFunc(GL_LEQUAL);//defualt is GL_LESS, this is for skybox trick
         captureEnvCubeMap();
-    }
 
+        cube_map.skybox_shader = std::make_unique<Shader>(
+            (ShaderPath+"background_v.glsl").c_str(),
+            (ShaderPath+"background_f.glsl").c_str()
+        );
+        cube_map.skybox_shader->use();
+        cube_map.skybox_shader->setInt("environmentMap",0);
+    }
+    void createIrradianceMap(){
+
+    }
     void init(){
-        // createEnvCubeMap();
+        createEnvCubeMap();
+        createIrradianceMap();
     }
     void setCamera(const std::unique_ptr<control::FPSCamera>& camera){
+        auto view = camera->getViewMatrix();
+        auto proj = glm::perspective(glm::radians(camera->getZoom()),(float)gl->Width()/gl->Height(),0.1f,100.f);
+        cube_map.skybox_shader->use();
+        cube_map.skybox_shader->setMat4("view",view);
+        cube_map.skybox_shader->setMat4("projection",proj);
 
     }
     void draw(){
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
 
+        cube_map.skybox_shader->use();
+        glBindVertexArray(cube_map.vao);
+        glBindTextureUnit(0,cube_map.env_cube);
+        glDrawArrays(GL_TRIANGLES,0,36);
+
+        GL_CHECK
     }
 };
 
@@ -393,26 +445,75 @@ class IBLApplication final:public Demo{
 
         camera = std::make_unique<control::FPSCamera>(glm::vec3{0.f,0.f,3.f});
     }
+    void process_input() override;
     void render_frame() override;
     void render_imgui() override;
 
-
+    enum class DrawType:int{
+        None = 0,
+        Direct = 1,
+        IBL = 2,
+        MIX = 3
+    };
+    DrawType draw_type{0};
     DirectRenderer direct_renderer{this->gl};
     IBLRenderer ibl_renderer{this->gl};
 };
 
+void IBLApplication::process_input(){
+
+      static auto t = glfwGetTime();
+      auto cur_t = glfwGetTime();
+      auto delta_t = cur_t - t;
+      t = cur_t;
+
+      if(glfwGetKey(gl->GetWindow(),GLFW_KEY_W))
+        camera->processKeyEvent(control::CameraDefinedKey::Forward,delta_t);
+      if(glfwGetKey(gl->GetWindow(),GLFW_KEY_S))
+        camera->processKeyEvent(control::CameraDefinedKey::Backward,delta_t);
+      if(glfwGetKey(gl->GetWindow(),GLFW_KEY_A))
+        camera->processKeyEvent(control::CameraDefinedKey::Left,delta_t);
+      if(glfwGetKey(gl->GetWindow(),GLFW_KEY_D))
+        camera->processKeyEvent(control::CameraDefinedKey::Right,delta_t);
+      if(glfwGetKey(gl->GetWindow(),GLFW_KEY_Q))
+        camera->processKeyEvent(control::CameraDefinedKey::Up,delta_t);
+      if(glfwGetKey(gl->GetWindow(),GLFW_KEY_E))
+        camera->processKeyEvent(control::CameraDefinedKey::Bottom,delta_t);
+
+}
+
 void IBLApplication::render_frame(){
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
     glClearColor(0.f,0.f,0.f,0.f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
+    switch (draw_type)
+    {
+        case DrawType::Direct:{
+            direct_renderer.setCamera(camera);
+            direct_renderer.draw();
+        }
+        break;
+        case DrawType::IBL:{
+            ibl_renderer.setCamera(camera);
+            ibl_renderer.draw();
+        }
+        break;
+        case DrawType::MIX:{
 
-    direct_renderer.setCamera(camera);
-    direct_renderer.draw();
+        }
+        break;
+        default:
+            break;
+    }
 
 }
 
 void IBLApplication::render_imgui(){
     ImGui::Text("IBL");
+    ImGui::Text("Draw Type");
+    ImGui::RadioButton("Direct Light",reinterpret_cast<int*>(&draw_type),1);
+    ImGui::RadioButton("IBL",reinterpret_cast<int*>(&draw_type),2);
 }
 
 

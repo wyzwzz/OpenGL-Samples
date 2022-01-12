@@ -46,18 +46,6 @@ void Demo::initGL()
       if(key==Key_Esc && action==Press){
           gl->Close();
       }
-      if(action!=Press && action!=Repeat) return;
-      switch (key)
-      {
-      case Key_W:camera->processKeyEvent(control::CameraDefinedKey::Forward,0.01);break;
-      case Key_S:camera->processKeyEvent(control::CameraDefinedKey::Backward,0.01);break;
-      case Key_A:camera->processKeyEvent(control::CameraDefinedKey::Left,0.01);break;
-      case Key_D:camera->processKeyEvent(control::CameraDefinedKey::Right,0.01);break;
-      case Key_Q:camera->processKeyEvent(control::CameraDefinedKey::Up,0.01);break;
-      case Key_E:camera->processKeyEvent(control::CameraDefinedKey::Bottom,0.01);break;
-      default:break;
-      }
-
     };
 
     GL::FileDropEvent = [&]( void *, int count, const char **df ){

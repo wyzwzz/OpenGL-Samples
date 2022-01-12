@@ -20,6 +20,7 @@ class Demo{
         initResource();
         try{
             while(!gl->Wait()){
+                process_input();
 
                 render_frame();
                 
@@ -42,6 +43,7 @@ class Demo{
 
         }
     }
+    virtual void process_input(){}
     virtual void render_frame(){}
     virtual void render_imgui(){}
     private:
