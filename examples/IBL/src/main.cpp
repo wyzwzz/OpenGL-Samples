@@ -3,6 +3,7 @@
 //
 #include <iostream>
 #include <vector>
+#include <array>
 #include <demo.hpp>
 #include <logger.hpp>
 #include <shader_program.hpp>
@@ -186,6 +187,27 @@ static void CreateCube(const std::shared_ptr<GL>& gl,GL::GLVertexArray& vao,GL::
         GL_CHECK
 }
 
+static void CreateQuad(const std::shared_ptr<GL>& gl,GL::GLVertexArray& vao,GL::GLBuffer& vbo){
+    static float quad_vertices[] = {
+    // positions        // texture Coords
+    -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+    -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+    1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+    1.0f, -1.0f, 0.0f, 1.0f, 0.0f,};
+    
+    vao = gl->CreateVertexArray();
+    vbo = gl->CreateBuffer();
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER,vbo);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(quad_vertices),quad_vertices,GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),(void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),(void*)(3*sizeof(float)));
+    glBindVertexArray(0);
+    GL_CHECK
+}
+
 class DirectRenderer{
 public:
     DirectRenderer(const std::shared_ptr<GL>& gl):gl(gl){}
@@ -228,11 +250,11 @@ public:
             (ShaderPath+"direct_pbr_v.glsl").c_str(),
             (ShaderPath+"direct_pbr_f.glsl").c_str());
 
-        CreateTexture(gl,material.albedo,TexturePath+"rested_iron/albedo.png");
-        CreateTexture(gl,material.normal,TexturePath+"rested_iron/normal.png");
-        CreateTexture(gl,material.metallic,TexturePath+"rested_iron/metallic.png");
-        CreateTexture(gl,material.roughness,TexturePath+"rested_iron/roughness.png");
-        CreateTexture(gl,material.ao,TexturePath+"rested_iron/ao.png");
+        CreateTexture(gl,material.albedo,TexturePath+"rusted_iron/albedo.png");
+        CreateTexture(gl,material.normal,TexturePath+"rusted_iron/normal.png");
+        CreateTexture(gl,material.metallic,TexturePath+"rusted_iron/metallic.png");
+        CreateTexture(gl,material.roughness,TexturePath+"rusted_iron/roughness.png");
+        CreateTexture(gl,material.ao,TexturePath+"rusted_iron/ao.png");
         pbr_shader->use();
         pbr_shader->setInt("albedoMap",albedo_tex_unit);
         pbr_shader->setInt("normalMap",normal_tex_unit);
@@ -309,11 +331,54 @@ public:
         GL::GLVertexArray vao;
         GL::GLBuffer vbo;
         std::unique_ptr<Shader> skybox_shader;
+        glm::mat4 captureProj;
+        std::array<glm::mat4,6> captureView;
     }cube_map;
 
+    struct PBRMaterial{
+        GL::GLTexture albeodo;
+        GL::GLTexture normal;
+        GL::GLTexture metallic;
+        GL::GLTexture roughness;
+        GL::GLTexture ao;
+    };
+    struct Sphere{
+        GL::GLVertexArray vao;
+        GL::GLBuffer vbo;
+        GL::GLBuffer ebo;
+        int index_count{0};
+    };
+    struct{
+        Sphere sphere;
+        PBRMaterial rusted_iron;
+        PBRMaterial gold;
+        PBRMaterial grass;
+        PBRMaterial plastic;
+        PBRMaterial wall;
+    }draw_model;
+
+    static constexpr uint32_t LightNum = 4;
+    struct{
+        glm::vec3 position;
+        glm::vec3 color;
+    }light[LightNum];
+    
+    struct{
+        GL::GLVertexArray quad_vao;
+        GL::GLBuffer quad_vbo;
+    }quad;
     struct{
         GL::GLTexture irradiance_map;
+        static constexpr uint32_t IrradianceMapSize = 32;
         std::unique_ptr<Shader> capture_irradiance_shader;
+        GL::GLTexture prefilter_map;
+        static constexpr uint32_t PrefilterMapSize = 128;
+        std::unique_ptr<Shader> prefilter_shader;
+        static constexpr uint32_t BRDFLUTSize = 512;
+        GL::GLTexture lut_map;
+
+        std::unique_ptr<Shader> brdf_shader;
+        std::unique_ptr<Shader> pbr_shader;
     }ibl;
 
     void createHDRTexture(const std::string& path){
@@ -339,8 +404,8 @@ public:
         }
     }
     void captureEnvCubeMap(){
-        static glm::mat4 captureProj = glm::perspective(glm::radians(90.f),1.f,0.1f,10.f);
-        static glm::mat4 captureView[] = {
+        cube_map.captureProj = glm::perspective(glm::radians(90.f),1.f,0.1f,10.f);
+        cube_map.captureView = {
             glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
             glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
             glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
@@ -350,13 +415,14 @@ public:
         };
         cube_map.equirectangular2cubemap_shader->use();
         cube_map.equirectangular2cubemap_shader->setInt("equirectangularMap",0);
-        cube_map.equirectangular2cubemap_shader->setMat4("projection",captureProj);
+        cube_map.equirectangular2cubemap_shader->setMat4("projection",cube_map.captureProj);
         glBindTextureUnit(0,cube_map.hdr);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,cube_map.env_cube);
         GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo));
         glViewport(0,0,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE);
         glBindVertexArray(cube_map.vao);
         for(uint32_t i = 0;i < 6; i++){
-            cube_map.equirectangular2cubemap_shader->setMat4("view",captureView[i]);
+            cube_map.equirectangular2cubemap_shader->setMat4("view",cube_map.captureView[i]);
             GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,cube_map.env_cube,0));           
             GL_EXPR(glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT));
             GL_EXPR(glDrawArrays(GL_TRIANGLES,0,36));
@@ -364,6 +430,11 @@ public:
         glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER,0);
         glViewport(0,0,gl->Width(),gl->Height());
+
+        //create cube map
+        glBindTexture(GL_TEXTURE_CUBE_MAP,cube_map.env_cube);
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
         GL_CHECK
     }
     void createEnvCubeMap(){
@@ -389,7 +460,7 @@ public:
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         GL_CHECK
@@ -399,7 +470,6 @@ public:
             (ShaderPath+"equirectangular2cubemap_f.glsl").c_str()
         );
 
-        glDepthFunc(GL_LEQUAL);//defualt is GL_LESS, this is for skybox trick
         captureEnvCubeMap();
 
         cube_map.skybox_shader = std::make_unique<Shader>(
@@ -409,12 +479,169 @@ public:
         cube_map.skybox_shader->use();
         cube_map.skybox_shader->setInt("environmentMap",0);
     }
-    void createIrradianceMap(){
+    void solveIrradianceMap(){
+        glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo);
+        glNamedRenderbufferStorage(cube_map.rbo,GL_DEPTH24_STENCIL8,ibl.IrradianceMapSize,ibl.IrradianceMapSize);
+        // glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,cube_map.rbo);
+        if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){
+            throw std::runtime_error("Framebuffer object is not complete!");
+        }
+        GL_CHECK
+
+        ibl.capture_irradiance_shader->use();
+        ibl.capture_irradiance_shader->setInt("environmentMap",0);
+        ibl.capture_irradiance_shader->setMat4("projection",cube_map.captureProj);
+        glBindTextureUnit(0,cube_map.env_cube);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,ibl.irradiance_map);
+        glViewport(0,0,ibl.IrradianceMapSize,ibl.IrradianceMapSize);
+        glBindVertexArray(cube_map.vao);
+        for(uint32_t i = 0; i < 6; i++){
+            ibl.capture_irradiance_shader->setMat4("view",cube_map.captureView[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,ibl.irradiance_map,0);
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            glDrawArrays(GL_TRIANGLES,0,36);
+        }
+        glBindVertexArray(0);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        glViewport(0,0,gl->Width(),gl->Height());
+        GL_CHECK
+    }
+    void createDiffuseMap(){
+        ibl.capture_irradiance_shader = std::make_unique<Shader>(
+            (ShaderPath+"cube_map_v.glsl").c_str(),
+            (ShaderPath+"irradiance_convolution_f.glsl").c_str()
+        );
+        ibl.irradiance_map = gl->CreateTexture(GL_TEXTURE_CUBE_MAP);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,ibl.irradiance_map);
+        for(uint32_t i = 0; i < 6; i++){
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,ibl.IrradianceMapSize,ibl.IrradianceMapSize,
+            0,GL_RGB,GL_FLOAT,nullptr);
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        GL_CHECK
+
+        solveIrradianceMap();
 
     }
+    void calcPrefilterMap(){
+        glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo);
+        ibl.prefilter_shader->use();
+        ibl.prefilter_shader->setInt("environmentMap",0);
+        ibl.prefilter_shader->setMat4("projection",cube_map.captureProj);
+        glBindTextureUnit(0,cube_map.env_cube);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,cube_map.env_cube);
+        uint32_t max_mip_levels = 5;
+        for(uint32_t mip = 0; mip < max_mip_levels; mip++){
+            uint32_t mip_width = ibl.PrefilterMapSize * std::pow(0.5,mip);
+            uint32_t mip_height = ibl.PrefilterMapSize * std::pow(0.5,mip);
+            glBindRenderbuffer(GL_RENDERBUFFER,cube_map.rbo);
+            glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,mip_width,mip_height);
+            glViewport(0,0,mip_width,mip_height);
+
+            float roughness = static_cast<float>(mip) / max_mip_levels - 1;
+            ibl.prefilter_shader->setFloat("roughness",roughness);
+            for(uint32_t i = 0; i < 6; i++){
+                ibl.prefilter_shader->setMat4("view",cube_map.captureView[i]);
+                glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,ibl.prefilter_map,mip);
+                glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                glBindVertexArray(cube_map.vao);
+                glDrawArrays(GL_TRIANGLES,0,36);
+            }
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+    }
+    void generateBRDFLUTMap(){
+        glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo);
+        glBindRenderbuffer(GL_RENDERBUFFER,cube_map.rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,ibl.BRDFLUTSize,ibl.BRDFLUTSize);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,ibl.lut_map,0);
+        glViewport(0,0,ibl.BRDFLUTSize,ibl.BRDFLUTSize);
+        
+        ibl.brdf_shader->use();
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(quad.quad_vao);
+        glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+        
+        glBindVertexArray(0);
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        GL_CHECK
+    }
+    void createSpecularMap(){
+        ibl.prefilter_map = gl->CreateTexture(GL_TEXTURE_CUBE_MAP);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,ibl.prefilter_map);
+        for(uint32_t i = 0; i < 6; i++){
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,ibl.PrefilterMapSize,ibl.PrefilterMapSize,0,GL_RGB,GL_FLOAT,nullptr);
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // be sure to set minification filter to mip_linear 
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // generate mipmaps for the cubemap so OpenGL automatically allocates the required memory.
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+        GL_CHECK
+
+        ibl.prefilter_shader = std::make_unique<Shader>(
+            (ShaderPath+"cube_map_v.glsl").c_str(),
+            (ShaderPath+"prefilter_f.glsl").c_str()
+        );
+
+        calcPrefilterMap();
+
+        ibl.lut_map = gl->CreateTexture(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D,ibl.lut_map);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RG16F,ibl.BRDFLUTSize,ibl.BRDFLUTSize,0,GL_RG,GL_FLOAT,nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        GL_CHECK
+
+        ibl.brdf_shader = std::make_unique<Shader>(
+            (ShaderPath+"brdf_v.glsl").c_str(),
+            (ShaderPath+"brdf_f.glsl").c_str()
+        );
+
+        CreateQuad(gl,quad.quad_vao,quad.quad_vbo);
+        generateBRDFLUTMap();
+    }
+    void LoadMaterial(PBRMaterial& material,const std::string& name){
+        CreateTexture(gl,material.albeodo,TexturePath+name+"/albedo.png");
+        CreateTexture(gl,material.normal,TexturePath+name+"/normal.png");
+        CreateTexture(gl,material.metallic,TexturePath+name+"/metallic.png");
+        CreateTexture(gl,material.roughness,TexturePath+name+"/roughness.png");
+        CreateTexture(gl,material.ao,TexturePath+name+"/ao.png");
+    }
+    void createDrawModel(){
+        CreateSphere(gl,draw_model.sphere.vao,draw_model.sphere.vbo,draw_model.sphere.ebo,draw_model.sphere.index_count);
+        LoadMaterial(draw_model.rusted_iron,"rusted_iron");
+        LoadMaterial(draw_model.gold,"gold");
+        LoadMaterial(draw_model.grass,"grass");
+        LoadMaterial(draw_model.plastic,"plastic");
+        LoadMaterial(draw_model.wall,"wall");
+    }
+    
     void init(){
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);//defualt is GL_LESS, this is for skybox trick
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);//无缝立方体贴图
+
         createEnvCubeMap();
-        createIrradianceMap();
+
+        createDiffuseMap();
+        createSpecularMap();
+        ibl.pbr_shader = std::make_unique<Shader>(
+           (ShaderPath+"ibl_pbr_v.glsl").c_str(),
+           (ShaderPath+"ibl_pbr_f.glsl").c_str() 
+        );
+
+        createDrawModel();
+
+        glViewport(0,0,gl->Width(),gl->Height());
     }
     void setCamera(const std::unique_ptr<control::FPSCamera>& camera){
         auto view = camera->getViewMatrix();
@@ -429,8 +656,10 @@ public:
 
         cube_map.skybox_shader->use();
         glBindVertexArray(cube_map.vao);
-        glBindTextureUnit(0,cube_map.env_cube);
+        glBindTextureUnit(0,ibl.irradiance_map);
         glDrawArrays(GL_TRIANGLES,0,36);
+
+        ibl.pbr_shader->use();
 
         GL_CHECK
     }

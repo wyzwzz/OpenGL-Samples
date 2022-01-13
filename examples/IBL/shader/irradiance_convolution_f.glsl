@@ -1,6 +1,6 @@
 #version 460 core
 layout(location = 0) in vec3 inWorldPos;
-layout(location = 1) out vec4 outFragColor;
+layout(location = 0) out vec4 outFragColor;
 
 uniform samplerCube enviromentMap;
 
@@ -17,7 +17,7 @@ void main(){
 
     vec3 up = vec3(0.f,1.f,0.f);//other is ok
     vec3 right = normalize(cross(up,N));
-    up = normalize(corss(N,right));
+    up = normalize(cross(N,right));
 
     float sample_delta = 0.025f;
     float nr_samples = 0.0;
