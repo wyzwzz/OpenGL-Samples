@@ -1,6 +1,6 @@
 #version 460 core
 layout(location = 0) in vec3 inWorldPos;
-layout(location = 0) out vec3 outFragColor;
+layout(location = 0) out vec4 outFragColor;
 
 uniform samplerCube environmentMap;
 uniform float roughness;
@@ -22,11 +22,20 @@ float RadicalInverse_Vdc(uint bits){
      return float(bits) * 2.3283064365386963e-10; // / 0x100000000
 }
 vec2 Hammersley(uint i, uint N){
-    return vec2(float(i)/float(N), RadicalInverse_VdC(i));
+    return vec2(float(i)/float(N), RadicalInverse_Vdc(i));
 }
 
 float DistributionGGX(vec3 N, vec3 H, float roughness){
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
 
+    float nom   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / denom;
 }
 
 vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness){
@@ -84,7 +93,7 @@ void main(){
 
             float mip_level = roughness == 0.f ? 0.f : 0.5f * log2(sa_sample / sa_texel);
 
-            prefiltered_color += textureLoad(environmentMap, L, mip_level).rgb * NdotL;
+            prefiltered_color += textureLod(environmentMap, L, mip_level).rgb * NdotL;
             total_weight += NdotL;
         }
     }

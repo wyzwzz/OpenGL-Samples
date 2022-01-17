@@ -4,6 +4,8 @@ layout(location = 0) out vec2 outFragColor;
 
 const float PI = 3.14159265359;
 
+const uint SampleCount = 1024u;
+
 float RadicalInverse_VdC(uint bits) 
 {
      bits = (bits << 16u) | (bits >> 16u);
@@ -45,6 +47,7 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
     // note that we use a different k for IBL
+    // 与直接光渲染的k计算不同
     float a = roughness;
     float k = (a * a) / 2.0;
 
@@ -65,7 +68,35 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 }
 
 vec2 IntegrateBRDF(float NdotV, float roughness){
+    vec3 V;
+    V.x = sqrt(1.f - NdotV * NdotV);
+    V.y = 0.f;
+    V.z = NdotV;
 
+    float A = 0.f;
+    float B = 0.f;
+
+    vec3 N = vec3(0.f,0.f,1.f);
+    for(uint i = 0u; i < SampleCount; i++){
+        vec2 Xi = Hammersley(i, SampleCount);
+        vec3 H = ImportanceSampleGGX(Xi, N, roughness);
+        vec3 L = normalize(2.f * dot(V, H) * H - V);
+
+        float NdotL = max(L.z, 0.f);
+        float NdotH = max(H.z, 0.f);
+        float VdotH = max(dot(V, H), 0.f);
+        if(NdotL > 0.f){
+            float G = GeometrySmith(N, V, L, roughness);
+            float G_Vis = (G * VdotH) / (NdotH * NdotV);
+            float Fc = pow(1.f - VdotH, 5.f);
+
+            A += (1.f - Fc) * G_Vis;
+            B += Fc * G_Vis;
+        }
+    }
+    A /= float(SampleCount);
+    B /= float(SampleCount);
+    return vec2(A, B);
 }
 
 void main(){

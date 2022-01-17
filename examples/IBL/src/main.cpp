@@ -381,6 +381,15 @@ public:
         std::unique_ptr<Shader> pbr_shader;
     }ibl;
 
+    static constexpr int albedo_tex_unit = 0;
+    static constexpr int normal_tex_unit = 1;
+    static constexpr int metallic_tex_unit = 2;
+    static constexpr int roughness_tex_unit = 3;
+    static constexpr int ao_tex_unit = 4;
+    static constexpr int irradiance_tex_unit = 5;
+    static constexpr int prefilter_tex_unit = 6;
+    static constexpr int lut_tex_unit = 7;
+
     void createHDRTexture(const std::string& path){
         stbi_set_flip_vertically_on_load(true);
         int width, height, nrComponents;
@@ -492,7 +501,7 @@ public:
         ibl.capture_irradiance_shader->setInt("environmentMap",0);
         ibl.capture_irradiance_shader->setMat4("projection",cube_map.captureProj);
         glBindTextureUnit(0,cube_map.env_cube);
-        glBindTexture(GL_TEXTURE_CUBE_MAP,ibl.irradiance_map);
+        glBindTexture(GL_TEXTURE_CUBE_MAP,cube_map.env_cube);
         glViewport(0,0,ibl.IrradianceMapSize,ibl.IrradianceMapSize);
         glBindVertexArray(cube_map.vao);
         for(uint32_t i = 0; i < 6; i++){
@@ -542,7 +551,7 @@ public:
             glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,mip_width,mip_height);
             glViewport(0,0,mip_width,mip_height);
 
-            float roughness = static_cast<float>(mip) / max_mip_levels - 1;
+            float roughness = static_cast<float>(mip) / (max_mip_levels - 1);
             ibl.prefilter_shader->setFloat("roughness",roughness);
             for(uint32_t i = 0; i < 6; i++){
                 ibl.prefilter_shader->setMat4("view",cube_map.captureView[i]);
@@ -642,6 +651,18 @@ public:
         createDrawModel();
 
         glViewport(0,0,gl->Width(),gl->Height());
+
+        ibl.pbr_shader->use();
+        ibl.pbr_shader->setInt("albedoMap",albedo_tex_unit);
+        ibl.pbr_shader->setInt("normalMap",normal_tex_unit);
+        ibl.pbr_shader->setInt("metallicMap",metallic_tex_unit);
+        ibl.pbr_shader->setInt("roughnessMap",roughness_tex_unit);
+        ibl.pbr_shader->setInt("aoMap",ao_tex_unit);
+        ibl.pbr_shader->setInt("irradianceMap",irradiance_tex_unit);
+        ibl.pbr_shader->setInt("prefilterMap",prefilter_tex_unit);
+        ibl.pbr_shader->setInt("brdfLUT",lut_tex_unit);
+
+        GL_CHECK
     }
     void setCamera(const std::unique_ptr<control::FPSCamera>& camera){
         auto view = camera->getViewMatrix();
@@ -649,17 +670,86 @@ public:
         cube_map.skybox_shader->use();
         cube_map.skybox_shader->setMat4("view",view);
         cube_map.skybox_shader->setMat4("projection",proj);
+        ibl.pbr_shader->use();
+        ibl.pbr_shader->setMat4("view",view);
+        ibl.pbr_shader->setMat4("projection",proj);
+        ibl.pbr_shader->setVec3("cameraPos",camera->getCameraPos());
 
     }
     void draw(){
+
         glBindFramebuffer(GL_FRAMEBUFFER,0);
+
+        ibl.pbr_shader->use();
+
+        glBindTextureUnit(irradiance_tex_unit,ibl.irradiance_map);
+        glBindTextureUnit(prefilter_tex_unit,ibl.prefilter_map);
+        glBindTextureUnit(lut_tex_unit,ibl.lut_map);
+
+        //rusted iron
+        glBindTextureUnit(albedo_tex_unit,draw_model.rusted_iron.albeodo);
+        glBindTextureUnit(normal_tex_unit,draw_model.rusted_iron.normal);
+        glBindTextureUnit(metallic_tex_unit,draw_model.rusted_iron.metallic);
+        glBindTextureUnit(roughness_tex_unit,draw_model.rusted_iron.roughness);
+        glBindTextureUnit(ao_tex_unit,draw_model.rusted_iron.ao);
+
+        auto model = glm::translate(glm::mat4(1.f),glm::vec3(-5.f,0.f,2.f));
+        ibl.pbr_shader->setMat4("model",model);
+        GL_EXPR(glBindVertexArray(draw_model.sphere.vao));
+        GL_EXPR(glDrawElements(GL_TRIANGLE_STRIP,draw_model.sphere.index_count,GL_UNSIGNED_INT,nullptr));
+
+        //gold
+        glBindTextureUnit(albedo_tex_unit,draw_model.gold.albeodo);
+        glBindTextureUnit(normal_tex_unit,draw_model.gold.normal);
+        glBindTextureUnit(metallic_tex_unit,draw_model.gold.metallic);
+        glBindTextureUnit(roughness_tex_unit,draw_model.gold.roughness);
+        glBindTextureUnit(ao_tex_unit,draw_model.gold.ao);
+
+        model = glm::translate(glm::mat4(1.f),glm::vec3(-2.f,0.f,2.f));
+        ibl.pbr_shader->setMat4("model",model);
+        GL_EXPR(glBindVertexArray(draw_model.sphere.vao));
+        GL_EXPR(glDrawElements(GL_TRIANGLE_STRIP,draw_model.sphere.index_count,GL_UNSIGNED_INT,nullptr));
+
+        //grass
+        glBindTextureUnit(albedo_tex_unit,draw_model.grass.albeodo);
+        glBindTextureUnit(normal_tex_unit,draw_model.grass.normal);
+        glBindTextureUnit(metallic_tex_unit,draw_model.grass.metallic);
+        glBindTextureUnit(roughness_tex_unit,draw_model.grass.roughness);
+        glBindTextureUnit(ao_tex_unit,draw_model.grass.ao);
+
+        model = glm::translate(glm::mat4(1.f),glm::vec3(1.f,0.f,2.f));
+        ibl.pbr_shader->setMat4("model",model);
+        GL_EXPR(glBindVertexArray(draw_model.sphere.vao));
+        GL_EXPR(glDrawElements(GL_TRIANGLE_STRIP,draw_model.sphere.index_count,GL_UNSIGNED_INT,nullptr));
+
+        //plastic
+        glBindTextureUnit(albedo_tex_unit,draw_model.plastic.albeodo);
+        glBindTextureUnit(normal_tex_unit,draw_model.plastic.normal);
+        glBindTextureUnit(metallic_tex_unit,draw_model.plastic.metallic);
+        glBindTextureUnit(roughness_tex_unit,draw_model.plastic.roughness);
+        glBindTextureUnit(ao_tex_unit,draw_model.plastic.ao);
+
+        model = glm::translate(glm::mat4(1.f),glm::vec3(4.f,0.f,2.f));
+        ibl.pbr_shader->setMat4("model",model);
+        GL_EXPR(glBindVertexArray(draw_model.sphere.vao));
+        GL_EXPR(glDrawElements(GL_TRIANGLE_STRIP,draw_model.sphere.index_count,GL_UNSIGNED_INT,nullptr));
+
+        //wall
+        glBindTextureUnit(albedo_tex_unit,draw_model.wall.albeodo);
+        glBindTextureUnit(normal_tex_unit,draw_model.wall.normal);
+        glBindTextureUnit(metallic_tex_unit,draw_model.wall.metallic);
+        glBindTextureUnit(roughness_tex_unit,draw_model.wall.roughness);
+        glBindTextureUnit(ao_tex_unit,draw_model.wall.ao);
+
+        model = glm::translate(glm::mat4(1.f),glm::vec3(7.f,0.f,2.f));
+        ibl.pbr_shader->setMat4("model",model);
+        GL_EXPR(glBindVertexArray(draw_model.sphere.vao));
+        GL_EXPR(glDrawElements(GL_TRIANGLE_STRIP,draw_model.sphere.index_count,GL_UNSIGNED_INT,nullptr));
 
         cube_map.skybox_shader->use();
         glBindVertexArray(cube_map.vao);
-        glBindTextureUnit(0,ibl.irradiance_map);
+        glBindTextureUnit(0, cube_map.env_cube);
         glDrawArrays(GL_TRIANGLES,0,36);
-
-        ibl.pbr_shader->use();
 
         GL_CHECK
     }
