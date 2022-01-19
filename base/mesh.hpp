@@ -27,3 +27,5 @@ struct mesh_t{
 };
 
 std::vector<mesh_t> load_meshed_from_obj(const std::string& filename);
+
+std::vector<triangle_t> load_triangles_from_obj(const std::string& filename);

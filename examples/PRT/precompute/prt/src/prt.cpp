@@ -129,6 +129,15 @@ namespace ProjEnv
                     int index = (y * width + x) * channel;
                     Eigen::Array3f Le(images[i][index + 0], images[i][index + 1],
                                       images[i][index + 2]);
+                    //cubemap上每个像素所代表的矩形区域投影到单位球面的面积 
+                    double weight = CalcArea(x,y,width,height);
+                    for(int l = 0; l<=SHOrder; l++){
+                        for(int m = -l; m <= l; m++){
+                            int index = sh::GetIndex(l,m);
+                            double sh = sh::EvalSH(l,m,dir.cast<double>().normalized());
+                            SHCoeffiecents[index] += sh * Le * weight;
+                        }
+                    }
                 }
             }
         }
@@ -210,12 +219,22 @@ public:
                 {
                     // TODO: here you need to calculate unshadowed transport term of a given direction
                     // TODO: 此处你需要计算给定方向下的unshadowed传输项球谐函数值
-                    return 0;
+                    double H = wi.dot(n);
+                    if(H>0.0) return H;
+                    return 0.0;
                 }
                 else
                 {
                     // TODO: here you need to calculate shadowed transport term of a given direction
                     // TODO: 此处你需要计算给定方向下的shadowed传输项球谐函数值
+                    double H = wi.dot(n);
+                    if(H>0.0){
+                        Ray3f ray(v,wi.normalized());
+                        if(scene->rayIntersect(ray)){
+                            return 0.0;
+                        }
+                        return H;
+                    }
                     return 0;
                 }
             };

@@ -10,3 +10,5 @@ add_subdirectory(RTRTDenoiser)
 add_subdirectory(SSRT)
 
 add_subdirectory(IBL)
+
+add_subdirectory(PRT)
