@@ -5,6 +5,8 @@
 #include <tiny_obj_loader.h>
 #include "mesh.hpp"
 #include "logger.hpp"
+#include <unordered_map>
+#include <glm/gtx/hash.hpp>
 std::vector<mesh_t> load_meshed_from_obj(const std::string &filename)
 {
     tinyobj::ObjReader reader;
@@ -57,6 +59,54 @@ std::vector<mesh_t> load_meshed_from_obj(const std::string &filename)
         }
     }
     return meshes;
+}
+
+namespace std{
+template <> struct hash<vertex_t>{
+    size_t operator()(const vertex_t& vertex) const{
+        return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.tex_coord) << 1);
+    }
+};
+}
+
+Mesh load_mesh_from_obj(const std::string& filename){
+        tinyobj::ObjReader reader;
+    if(!reader.ParseFromFile(filename)){
+        throw std::runtime_error(reader.Error());
+    }
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+
+    Mesh mesh;
+
+
+    std::unordered_map<vertex_t,uint32_t> unique_vertices{};
+
+    for(const auto& shape:shapes){
+        for(const auto& index:shape.mesh.indices){
+            vertex_t vertex{};
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+            vertex.normal = {
+                attrib.normals[3 * index.normal_index + 0],
+                attrib.normals[3 * index.normal_index + 1],
+                attrib.normals[3 * index.normal_index + 2]
+            };
+            vertex.tex_coord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+            if(unique_vertices.count(vertex) == 0){
+                unique_vertices[vertex] = static_cast<uint32_t>(mesh.vertices.size());
+                mesh.vertices.push_back(vertex);
+            }
+            mesh.indices.push_back(unique_vertices[vertex]);
+        }
+    }
+    return mesh;
 }
 
 std::vector<triangle_t> load_triangles_from_obj(const std::string& filename){

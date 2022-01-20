@@ -12,6 +12,9 @@ struct vertex_t{
     vec3f pos;
     vec3f normal;
     vec2f tex_coord;
+    bool operator==(const vertex_t& other) const{
+        return pos == other.pos && normal == other.normal && tex_coord == other.tex_coord;
+    }
 };
 
 struct triangle_t{
@@ -25,6 +28,13 @@ struct mesh_t{
     std::vector<float> tex_coords;
     std::vector<uint32_t> indices;
 };
+
+struct Mesh{
+    std::vector<vertex_t> vertices;
+    std::vector<uint32_t> indices;
+};
+
+Mesh load_mesh_from_obj(const std::string& filename);
 
 std::vector<mesh_t> load_meshed_from_obj(const std::string& filename);
 
