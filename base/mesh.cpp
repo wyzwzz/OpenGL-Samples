@@ -147,7 +147,7 @@ std::vector<triangle_t> load_triangles_from_obj(const std::string& filename){
                 attrib.vertices[3*index.vertex_index+1],attrib.vertices[3*index.vertex_index+2]};
                 
                 tri.vertices[k].normal={attrib.normals[3*index.normal_index+0],
-                attrib.vertices[3*index.normal_index+1],3*index.normal_index+2};
+                attrib.normals[3*index.normal_index+1],attrib.normals[3*index.normal_index+2]};
                 
                 tri.vertices[k].tex_coord={attrib.texcoords[2*index.texcoord_index+0],
                 attrib.texcoords[2*index.texcoord_index+1]};
