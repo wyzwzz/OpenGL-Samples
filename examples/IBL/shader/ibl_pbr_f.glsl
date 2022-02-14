@@ -60,7 +60,7 @@ void main(){
     for(int i = 0; i < LightNum; i++){
 
     }
-    vec3 F = vec3(0.5f);//fresnelSchlickRoughness(max(dot(N,V), 0.f), F0, roughness);
+    vec3 F = fresnelSchlickRoughness(max(dot(N,V), 0.f), F0, roughness);
 
     vec3 kS = F;
     vec3 kD = 1.f - kS;
