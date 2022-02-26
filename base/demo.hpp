@@ -2,6 +2,7 @@
 #include "GLImpl.hpp"
 #include "camera.hpp"
 #include "mesh.hpp"
+#include "benchmark.hpp"
 using namespace gl;
 using GL = GLContext<GLFWImpl, GLADImpl>;
 class Demo
@@ -15,9 +16,10 @@ class Demo
     decltype(GL::New()) gl;
     int window_w, window_h;
     std::unique_ptr<control::FPSCamera> camera;
-
+    Benchmark bench_mark;
   public:
     Demo();
+    
     void run()
     {
         initResource();
@@ -27,7 +29,7 @@ class Demo
             {
                 process_input();
 
-                render_frame();
+                _render_frame();
 
                 begin_imgui();
 
@@ -47,6 +49,7 @@ class Demo
         {
         }
     }
+  protected:
     virtual void process_input()
     {
     }
@@ -58,6 +61,7 @@ class Demo
     }
 
   private:
+    void _render_frame();
     void begin_imgui();
     void end_imgui();
 };

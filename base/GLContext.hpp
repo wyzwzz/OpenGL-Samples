@@ -237,7 +237,7 @@ template <typename GLContextImpl, typename GLAPILoaderImpl, GLObjectType type> c
     }
 
   public:
-    GLObject() = delete;
+    GLObject() = default;
     GLObject(const GLObject &) = delete;
     GLObject &operator=(const GLObject &) = delete;
 
@@ -281,7 +281,7 @@ template <typename GLContextImpl, typename GLAPILoaderImpl, GLObjectType type> c
         gl_context = nullptr;
         m_object = 0;
     }
-    
+
     ~GLObject()
     {
         Release();

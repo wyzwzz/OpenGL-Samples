@@ -49,6 +49,14 @@ void Demo::initGL()
         {
             gl->Close();
         }
+        else if(key == Key_B && action == Press){
+            if(bench_mark.isActive()){
+                bench_mark.stop();
+            }
+            else{
+                bench_mark.start();
+            }
+        }
     };
 
     GL::FileDropEvent = [&](void *, int count, const char **df) {
@@ -63,6 +71,8 @@ void Demo::initGL()
 Demo::Demo()
 {
     initGL();
+
+
 }
 void Demo::begin_imgui()
 {
@@ -76,4 +86,15 @@ void Demo::end_imgui()
     ImGui::EndFrame();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void Demo::_render_frame(){
+    if(bench_mark.isActive()){
+        bench_mark.run([this](){
+            render_frame();
+            });
+    }
+    else{
+        render_frame();
+    }
 }

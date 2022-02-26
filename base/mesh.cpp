@@ -20,7 +20,7 @@ template <> struct hash<gl::vertex_t>
 namespace gl
 {
 
-std::vector<mesh_t> load_meshed_from_obj(const std::string &filename)
+std::vector<mesh_t> load_mesh_t_from_obj(const std::string &filename)
 {
     tinyobj::ObjReader reader;
     if (!reader.ParseFromFile(filename))
@@ -98,7 +98,7 @@ std::vector<Mesh> load_mesh_from_obj(const std::string &filename)
         const size_t vertex_count = attrib.vertices.size() / 3;
         LOG_INFO("triangle count {0}", triangle_count);
         LOG_INFO("vertex count {0}", vertex_count);
-        
+
         meshes.emplace_back();
         auto& mesh = meshes.back();
         for (const auto &index : shape.mesh.indices)

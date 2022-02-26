@@ -7,11 +7,12 @@ class ShadowMapApplication final: public Demo{
     void initResource() override{
         glEnable(GL_DEPTH_TEST);
 
+        const std::string marry_model_path = "D:\\Projects\\OpenGLSamples\\data\\mary\\Marry.obj";
+        const std::string floor_model_path = "D:/Projects/OpenGLSamples/data/floor/floor.obj";
 
+        meshes = load_mesh_t_from_obj(marry_model_path);
 
-        meshes = load_meshed_from_obj("C:\\Users\\wyz\\projects\\OpenGL-Samples\\data\\mary\\Marry.obj");
-
-        auto floor = load_meshed_from_obj("C:/Users/wyz/projects/OpenGL-Samples/data/floor/floor.obj");
+        auto floor = load_mesh_t_from_obj(floor_model_path);
         meshes.insert(meshes.end(),floor.begin(),floor.end());
 
         for(auto& mesh:meshes){
@@ -94,12 +95,12 @@ class ShadowMapApplication final: public Demo{
             this->shadow_tex = tex;
         }
         shadow_shader = std::make_unique<Shader>(
-            "C:\\Users\\wyz\\projects\\OpenGL-Samples\\examples\\shadowmap\\shader\\shadow_v.glsl",
-            "C:\\Users\\wyz\\projects\\OpenGL-Samples\\examples\\shadowmap\\shader\\shadow_f.glsl"
+            "D:/Projects\\OpenGLSamples\\examples\\shadowmap\\shader\\shadow_v.glsl",
+            "D:/Projects\\OpenGLSamples\\examples\\shadowmap\\shader\\shadow_f.glsl"
             );
         phong_shader = std::make_unique<Shader>(
-            "C:\\Users\\wyz\\projects\\OpenGL-Samples\\examples\\shadowmap\\shader\\phong_v.glsl",
-            "C:\\Users\\wyz\\projects\\OpenGL-Samples\\examples\\shadowmap\\shader\\phong_f.glsl"
+            "D:/Projects\\OpenGLSamples\\examples\\shadowmap\\shader\\phong_v.glsl",
+            "D:/Projects\\OpenGLSamples\\examples\\shadowmap\\shader\\phong_f.glsl"
             );
 
         light.position = glm::vec3(5.f,5.f,0.f);
