@@ -9,7 +9,7 @@ using GL=GLContext<GLFWImpl,GLADImpl>;
 int main(){
 
     auto gl=GL::New();
-
+    GL_CHECK
     GL::MouseEvent=[&]( void *, MouseButton buttons, EventAction action, int xpos, int ypos){
 
     };
@@ -33,28 +33,29 @@ int main(){
                                                     {1.f,0.5f,1.f},
                                                     {0.5f,0.f,0.5f},
                                                     {0.5f,1.f,1.f}};
-    uint32_t vao;
-    glGenVertexArrays(1,&vao);
+
+    auto vao = gl->CreateVertexArray();
+
     glBindVertexArray(vao);
-    uint32_t vbo;
-    glGenBuffers(1,&vbo);
+    auto vbo = gl->CreateBuffer();
     glBindBuffer(GL_ARRAY_BUFFER,vbo);
     glBufferData(GL_ARRAY_BUFFER,9*sizeof(float),camera_points.data(),GL_STATIC_DRAW);
     glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),0);
     glEnableVertexAttribArray(0);
-
+    GL_CHECK
     Shader shader(
-        "C:\\Users\\wyz\\projects\\OpenGL-Samples\\examples\\test\\line_shader_v.glsl",
-        "C:\\Users\\wyz\\projects\\OpenGL-Samples\\examples\\test\\line_shader_f.glsl"
+        "D:\\Projects\\OpenGLSamples\\examples\\test\\line_shader_v.glsl",
+        "D:\\Projects\\OpenGLSamples\\examples\\test\\line_shader_f.glsl"
         );
+    GL_CHECK
     while(!gl->Wait()){
 
         GL_EXPR(glClearColor(0.f,0.f,0.f,0.f));
         GL_EXPR(glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT));
 
-        glBindVertexArray(vao);
+        GL_EXPR(glBindVertexArray(vao));
         shader.use();
-        glDrawArrays(GL_TRIANGLES,0,6);
+        GL_EXPR(glDrawArrays(GL_TRIANGLES,0,3));
 
         gl->Present();
         gl->DispatchEvent();

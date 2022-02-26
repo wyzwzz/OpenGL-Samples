@@ -1,7 +1,3 @@
-//
-// Created by wyz on 2021/8/27.
-//
-
 #pragma once
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -26,8 +22,7 @@ class GLFWImpl : public EventListenerTraits
     {
         if (glfwInit() == GLFW_FALSE)
         {
-            std::cout << "Failed to init GLFW" << std::endl;
-            return;
+            throw std::runtime_error("Failed to init GLFW");
         }
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -37,8 +32,7 @@ class GLFWImpl : public EventListenerTraits
         auto pWin = glfwCreateWindow(1920, 1080, "GLContext", nullptr, nullptr);
         if (pWin == nullptr)
         {
-            std::cout << "Failed to create GLFW window\n";
-            exit(-1);
+            throw std::runtime_error("Failed to create GLFW window");
         }
         window.reset(pWin);
         MakeCurrent();
@@ -107,15 +101,17 @@ class GLFWImpl : public EventListenerTraits
         case GLFW_KEY_KP_7: return Key_7;
         case GLFW_KEY_KP_8: return Key_8;
         case GLFW_KEY_KP_9: return Key_9;
-        default: std::cout << "Unsupported key\n";
+        default: LOG_INFO("{}","Unsupported key");
         }
         return KeyButton::Key_Unknown;
     }
     static void glfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     {
+        assert(EventListenerTraits::MouseEvent);
         EventListenerTraits::MouseEvent(window,Mouse_Left,EventAction::Move,(int)xpos,(int)ypos);
     }
     static void glfwMouseButtonCallback(GLFWwindow * window, int button, int action, int mods){
+        assert(EventListenerTraits::MouseEvent);
         double xpos, ypos;
         glfwGetCursorPos( window, &xpos, &ypos );
         int buttons = 0;
@@ -133,12 +129,15 @@ class GLFWImpl : public EventListenerTraits
         EventListenerTraits::MouseEvent(window,(MouseButton)buttons,(EventAction)ea,(int)xpos,(int)ypos);
     }
     static void glfwFramebufferSizeCallback(GLFWwindow * window, int width, int height){
+        assert(EventListenerTraits::FramebufferResizeEvent);
         EventListenerTraits::FramebufferResizeEvent(window,width,height);
     }
     static void glfwMouseScrollCallback(GLFWwindow * window, double xoffset, double yoffset){
+        assert(EventListenerTraits::ScrollEvent);
         EventListenerTraits::ScrollEvent(window,xoffset,yoffset);
     }
     static void glfwKeyCallback(GLFWwindow * window, int key, int scancode, int action, int mods){
+        assert(EventListenerTraits::KeyboardEvent);
         int ea = 0;
         if(action == GLFW_PRESS)
             ea = EventAction::Press;
@@ -227,8 +226,7 @@ class GLADImpl
     static void InitGLAPI()
     {
         if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
-            std::cout<<"GLAD failed to load opengl api"<<std::endl;
-            exit(-1);
+            throw std::runtime_error("GLAD failed to load opengl api");
         }
     }
 };

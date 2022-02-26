@@ -1,15 +1,12 @@
-//
-// Created by wyz on 2021/8/26.
-//
-
 #pragma once
-
 #include <array>
 #include <cstdint>
 #include <functional>
 
-template <typename TexType, uint32_t DIM>
-class TextureBase
+namespace gl
+{
+
+template <typename TexType, uint32_t DIM> class TextureBase
 {
     struct UnInit
     {
@@ -178,29 +175,34 @@ class TextureBase
     }
 
   private:
-    template <uint32_t D>
-    SizeType ToLinearIndex(const CoordType &coord) const noexcept{
-        static_assert(D<4,"Dim for should less than 4.");
-          switch(D){
-              case 1:return coord[0];
-              case 2:return shape[0] * coord[1] + coord[0];
-              case 3:return (SizeType)shape[0] * (shape[1] * coord[2] + coord[1]) + coord[0];
-          }
+    template <uint32_t D> SizeType ToLinearIndex(const CoordType &coord) const noexcept
+    {
+        static_assert(D < 4, "Dim for should less than 4.");
+
+        if constexpr (D == 1)
+        {
+            return coord[0];
+        }
+        else if (D == 2)
+        {
+            return shape[0] * coord[1] + coord[0];
+        }
+        else if (D == 3)
+        {
+            return (SizeType)shape[0] * (shape[1] * coord[2] + coord[1]) + coord[0];
+        }
     }
-#ifdef _WIN32
-    template <>
-    SizeType ToLinearIndex<1>(const CoordType &coord) const noexcept
+#if defined(_WIN32) && !_HAS_CXX17
+    template <> SizeType ToLinearIndex<1>(const CoordType &coord) const noexcept
     {
         return coord[0];
     }
 
-    template <>
-    SizeType ToLinearIndex<2>(const CoordType &coord) const noexcept
+    template <> SizeType ToLinearIndex<2>(const CoordType &coord) const noexcept
     {
         return shape[0] * coord[1] + coord[0];
     }
-    template <>
-    SizeType ToLinearIndex<3>(const CoordType &coord) const noexcept
+    template <> SizeType ToLinearIndex<3>(const CoordType &coord) const noexcept
     {
         // 3-dimension texture may overflow use uint32_t for multiply
         return (SizeType)shape[0] * (shape[1] * coord[2] + coord[1]) + coord[0];
@@ -220,8 +222,7 @@ class TextureBase
     CoordType shape;
 };
 
-template <typename TexType>
-class Texture1D : public TextureBase<TexType, 1>
+template <typename TexType> class Texture1D : public TextureBase<TexType, 1>
 {
   public:
     using Base = TextureBase<TexType, 1>;
@@ -316,8 +317,7 @@ class Texture1D : public TextureBase<TexType, 1>
     }
 };
 
-template <typename TexType>
-class Texture2D : public TextureBase<TexType, 2>
+template <typename TexType> class Texture2D : public TextureBase<TexType, 2>
 {
   public:
     using Base = TextureBase<TexType, 2>;
@@ -419,13 +419,12 @@ class Texture2D : public TextureBase<TexType, 2>
         for (SizeType row = offset_y; row < offset_y + length_y; row++)
         {
             memcpy(Base::RawData() + row * GetWidth() + offset_x, data + (row - offset_y) * length_x,
-                     length_x * sizeof(TexType));
+                   length_x * sizeof(TexType));
         }
     }
 };
 
-template <typename TexType>
-class Texture3D : public TextureBase<TexType, 3>
+template <typename TexType> class Texture3D : public TextureBase<TexType, 3>
 {
   public:
     using Base = TextureBase<TexType, 3>;
@@ -537,10 +536,11 @@ class Texture3D : public TextureBase<TexType, 3>
             for (SizeType row = offset_y; row < offset_y + length_y; row++)
             {
                 memcpy(Base::RawData() + depth * GetXSize() * GetYSize() + row * GetXSize() + offset_x,
-                         data + (depth - offset_z) * length_x * length_y + (row - offset_y) * length_x,
-                         length_x * sizeof(TexType));
+                       data + (depth - offset_z) * length_x * length_y + (row - offset_y) * length_x,
+                       length_x * sizeof(TexType));
             }
         }
     }
 };
 
+} // namespace gl

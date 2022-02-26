@@ -1,12 +1,9 @@
-//
-// Created by wyz on 2021/10/12.
-//
 #pragma once
-namespace gls{
+namespace gl
+{
 
-    class BenchMark{
+class BenchMark
+{
+};
 
-    };
-
-
-}
+} // namespace gl
