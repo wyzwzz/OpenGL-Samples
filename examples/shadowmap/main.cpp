@@ -66,7 +66,7 @@ class ShadowMapApplication final : public Demo
             shadow_rbo = gl->CreateRenderbuffer();
             glBindRenderbuffer(GL_RENDERBUFFER, shadow_rbo);
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, shadow_w, shadow_h);
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, shadow_rbo);
             GL_CHECK
             shadow_tex = gl->CreateTexture(GL_TEXTURE_2D);
             glBindTexture(GL_TEXTURE_2D, shadow_tex);
