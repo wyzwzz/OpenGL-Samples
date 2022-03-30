@@ -342,7 +342,7 @@ class GLContext final : public std::enable_shared_from_this<GLContext<GLContextI
     auto CreateFramebuffer()
     {
         uint32_t handle = 0;
-        GL_EXPR(glCreateFramebuffers(1, &handle));
+        GL_EXPR(glGenFramebuffers(1, &handle));
         return GLFramebuffer(this->shared_from_this(), handle);
     }
     void DeleteGLObject(GLFramebuffer &object)

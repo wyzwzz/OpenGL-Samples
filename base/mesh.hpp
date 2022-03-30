@@ -41,7 +41,7 @@ struct Mesh
     std::vector<uint32_t> indices;
 };
 
-std::vector<Mesh> load_mesh_from_obj(const std::string &filename);
+Mesh load_mesh_from_obj(const std::string &filename);
 
 std::vector<mesh_t> load_mesh_t_from_obj(const std::string &filename);
 

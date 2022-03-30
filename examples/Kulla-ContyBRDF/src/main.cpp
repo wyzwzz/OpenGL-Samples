@@ -193,7 +193,7 @@ class KullaContyBRDFAPPlication final : public Demo{
         kc_pbr_shader->setInt("uEavgLut",lut.EavgTexUint);
     }
     
-    struct{
+    struct LUT{
         Texture2D<float> Emiu_data;
         Texture1D<float> Eavg_data;
         GL::GLTexture Emiu_tex;

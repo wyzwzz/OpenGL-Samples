@@ -321,7 +321,7 @@ public:
     IBLRenderer(const std::shared_ptr<GL>& gl):gl(gl){}
 
     std::shared_ptr<GL> gl;
-    struct{
+    struct CubeMap{
         GL::GLFramebuffer fbo;
         GL::GLRenderbuffer rbo;
         GL::GLTexture hdr;
@@ -367,7 +367,7 @@ public:
         GL::GLVertexArray quad_vao;
         GL::GLBuffer quad_vbo;
     }quad;
-    struct{
+    struct IBL{
         GL::GLTexture irradiance_map;
         static constexpr uint32_t IrradianceMapSize = 32;
         std::unique_ptr<Shader> capture_irradiance_shader;
@@ -452,7 +452,7 @@ public:
         cube_map.rbo = gl->CreateRenderbuffer();
         glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo);
         glBindRenderbuffer(GL_RENDERBUFFER,cube_map.rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE);
+        glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,CubeMap::CUBE_SIZE,CubeMap::CUBE_SIZE);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,cube_map.rbo);
         if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){
             throw std::runtime_error("Framebuffer object is not complete!");
@@ -464,7 +464,7 @@ public:
         cube_map.env_cube = gl->CreateTexture(GL_TEXTURE_CUBE_MAP);
         glBindTexture(GL_TEXTURE_CUBE_MAP,cube_map.env_cube);
         for(uint32_t i = 0;i < 6; i++){
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,cube_map.CUBE_SIZE,cube_map.CUBE_SIZE,0,GL_RGB,GL_FLOAT,nullptr);
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,CubeMap::CUBE_SIZE,CubeMap::CUBE_SIZE,0,GL_RGB,GL_FLOAT,nullptr);
         }
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -490,10 +490,10 @@ public:
     }
     void solveIrradianceMap(){
         glBindFramebuffer(GL_FRAMEBUFFER,cube_map.fbo);
-        glNamedRenderbufferStorage(cube_map.rbo,GL_DEPTH24_STENCIL8,ibl.IrradianceMapSize,ibl.IrradianceMapSize);
-        // glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,cube_map.rbo);
+        GL_EXPR(glNamedRenderbufferStorage(cube_map.rbo,GL_DEPTH24_STENCIL8,IBL::IrradianceMapSize,IBL::IrradianceMapSize));
+//        glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,cube_map.rbo);
         if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){
-            throw std::runtime_error("Framebuffer object is not complete!");
+            throw std::runtime_error("IrradianceMap framebuffer object is not complete!");
         }
         GL_CHECK
 
@@ -523,7 +523,7 @@ public:
         ibl.irradiance_map = gl->CreateTexture(GL_TEXTURE_CUBE_MAP);
         glBindTexture(GL_TEXTURE_CUBE_MAP,ibl.irradiance_map);
         for(uint32_t i = 0; i < 6; i++){
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,ibl.IrradianceMapSize,ibl.IrradianceMapSize,
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_RGB16F,IBL::IrradianceMapSize,IBL::IrradianceMapSize,
             0,GL_RGB,GL_FLOAT,nullptr);
         }
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

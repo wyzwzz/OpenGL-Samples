@@ -78,7 +78,7 @@ std::vector<mesh_t> load_mesh_t_from_obj(const std::string &filename)
 
 
 
-std::vector<Mesh> load_mesh_from_obj(const std::string &filename)
+Mesh load_mesh_from_obj(const std::string &filename)
 {
     tinyobj::ObjReader reader;
     if (!reader.ParseFromFile(filename))
@@ -88,7 +88,7 @@ std::vector<Mesh> load_mesh_from_obj(const std::string &filename)
     auto &attrib = reader.GetAttrib();
     auto &shapes = reader.GetShapes();
 
-    std::vector<Mesh> meshes;
+    Mesh mesh;
 
     std::unordered_map<vertex_t, uint32_t> unique_vertices{};
 
@@ -99,8 +99,6 @@ std::vector<Mesh> load_mesh_from_obj(const std::string &filename)
         LOG_INFO("triangle count {0}", triangle_count);
         LOG_INFO("vertex count {0}", vertex_count);
 
-        meshes.emplace_back();
-        auto& mesh = meshes.back();
         for (const auto &index : shape.mesh.indices)
         {
             vertex_t vertex{};
@@ -118,7 +116,7 @@ std::vector<Mesh> load_mesh_from_obj(const std::string &filename)
             mesh.indices.push_back(unique_vertices[vertex]);
         }
     }
-    return meshes;
+    return mesh;
 }
 
 std::vector<triangle_t> load_triangles_from_obj(const std::string &filename)
