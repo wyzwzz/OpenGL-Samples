@@ -830,6 +830,7 @@ void IBLApplication::render_frame(){
 
 void IBLApplication::render_imgui(){
     ImGui::Text("IBL");
+    ImGui::Text("fps: %f",ImGui::GetIO().Framerate);
     ImGui::Text("Draw Type");
     ImGui::RadioButton("Direct Light",reinterpret_cast<int*>(&draw_type),1);
     ImGui::RadioButton("IBL",reinterpret_cast<int*>(&draw_type),2);
