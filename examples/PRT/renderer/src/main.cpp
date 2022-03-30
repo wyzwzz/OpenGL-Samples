@@ -214,6 +214,8 @@ class PRTApplication final:public Demo{
 };
 
 void PRTApplication::initResource(){
+    gl->SetWindowTitle("PRT");
+
     glEnable(GL_DEPTH_TEST);
 
     loadEnvironmentMap();

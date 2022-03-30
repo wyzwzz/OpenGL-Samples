@@ -34,7 +34,7 @@ class GLFWImpl : public EventListenerTraits
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_DOUBLEBUFFER, true);
 
-        auto pWin = glfwCreateWindow(1920, 1080, "GLContext", nullptr, nullptr);
+        auto pWin = glfwCreateWindow(1280, 720, "GLContext", nullptr, nullptr);
         if (pWin == nullptr)
         {
             std::cout << "Failed to create GLFW window\n";
@@ -48,8 +48,10 @@ class GLFWImpl : public EventListenerTraits
         glfwSetScrollCallback(window.get(), glfwMouseScrollCallback);
         glfwSetKeyCallback(window.get(), glfwKeyCallback);
         glfwSetDropCallback(window.get(), glfwDropFileCallback);
+        glfwSwapInterval(1);
 
     }
+
     static KeyButton TranslateKey(int key, int scancode, int mods){
         switch ( key )
         {
@@ -180,6 +182,9 @@ class GLFWImpl : public EventListenerTraits
     }
     GLFWwindow* GetWindow(){
         return window.get();
+    }
+    void SetWindowTitle(const std::string& name){
+        glfwSetWindowTitle(window.get(),name.c_str());
     }
     bool Wait() const
     {
