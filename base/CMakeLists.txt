@@ -37,3 +37,7 @@ target_include_directories(
 #        $<INSTALL_INTERFACE:base>
         ${PROJECT_SOURCE_DIR}/third_party/glad/include
 )
+
+target_compile_features(
+        base PUBLIC cxx_std_17
+)

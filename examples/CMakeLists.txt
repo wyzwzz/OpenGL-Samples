@@ -1,9 +1,5 @@
 
-add_subdirectory(test)
-
-add_subdirectory(tinyobjloader)
-
-add_subdirectory(shadowmap)
+add_subdirectory(ShadowMap)
 
 add_subdirectory(RTRTDenoiser)
 
