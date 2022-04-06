@@ -48,6 +48,6 @@ void main() {
         FragColor = imageLoad(CompositeColor,ivec2(gl_FragCoord));
     }
     else{
-        FragColor = vec4(0.f,0.f,1.f,1.f);
+        FragColor = vec4(0.f,0.f,0.f,1.f);
     }
 }

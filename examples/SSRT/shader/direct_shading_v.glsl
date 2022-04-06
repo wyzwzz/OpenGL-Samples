@@ -12,5 +12,5 @@ layout(location = 1) out vec3 outVertexPos;
 void main(){
     gl_Position = CameraMVP * vec4(VertexPos,1.f);
     outVertexPos = VertexPos;
-    outVertexNormal = VertexNormal;
+    outVertexNormal = normalize(VertexNormal);
 }

@@ -277,7 +277,7 @@ inline glm::vec3 TrackBallCamera::getCameraUp() const
 
 constexpr float PITCH = 0.0f;
 constexpr float YAW = -90.0f;
-constexpr float SPEED = 20.f;
+constexpr float SPEED = 2.f;
 constexpr float SENSITIVITY = 0.3f;
 constexpr float ZOOM = 20.0f;
 

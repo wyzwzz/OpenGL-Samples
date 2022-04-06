@@ -32,8 +32,7 @@ vec3 blinnPhong(){
 //    vec3 normal = normalize(imageLoad(GBufferNormal,ivec2(gl_FragCoord)).rgb);
     float diff = max(dot(light_dir,normal),0.f);
     vec3 diffuse = diff * LightRadiance * color;
-
-    vec3 frag_pos = imageLoad(GBufferPos,ivec2(gl_FragCoord)).rgb;
+    vec3 frag_pos = inFragPos;//imageLoad(GBufferPos,ivec2(gl_FragCoord)).rgb;
     vec3 view_dir = normalize(CameraPos-frag_pos);
     vec3 half_dir = normalize(light_dir+view_dir);
     float spec = pow(max(dot(half_dir,normal),0.f),32.f);

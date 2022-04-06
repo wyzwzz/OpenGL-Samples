@@ -9,7 +9,7 @@ uniform sampler2D AlbedoMap;
 uniform sampler2D ShadowMap;
 uniform vec3 light_dir;
 uniform vec3 camera_pos;
-
+uniform int shadow_mode;
 
 float unpack(vec4 rgbaDepth) {
     const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
@@ -29,7 +29,7 @@ float Bias(){
 }
 
 float useShadowMap(sampler2D shadow_map,vec4 shadow_coord){
-    float  bias = Bias();
+    float bias = Bias();
     vec4 depth_pack = texture(shadow_map,shadow_coord.xy);
 //    float depth_unpack = unpack(depth_pack);
     float depth_unpack = depth_pack.x;
@@ -78,6 +78,20 @@ float textureProj(vec4 shadowCoord, vec2 off)
 	}
 	return shadow;
 }
+float textureProjDepth(vec4 shadowCoord, vec2 off)
+{
+    float depth = 0.0;
+    if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
+    {
+        float bias = Bias();
+        float dist = texture( ShadowMap, shadowCoord.st + off ).r;
+        if ( shadowCoord.w > 0.0 && dist < shadowCoord.z - bias)
+        {
+            depth = dist;
+        }
+    }
+    return depth;
+}
 
 //使用pcf会导致凹陷的三角面片会产生额外的阴影
 //此处使用了简单的均匀采样 使用一些随机采样效果会更好 比如poission disk采样
@@ -104,15 +118,58 @@ float filterPCF(vec4 sc)
 	}
 	return shadowFactor / count;
 }
+
+float filterPCSS(vec4 sc){
+    ivec2 texDim = textureSize(ShadowMap, 0);
+    float scale = 1.0;
+    float dx = scale * 1.0 / float(texDim.x);
+    float dy = scale * 1.0 / float(texDim.y);
+
+    float depth = 0.0;
+    int count = 0;
+    int range = 1;
+
+    for (int x = -range; x <= range; x++)
+    {
+        for (int y = -range; y <= range; y++)
+        {
+            depth += textureProjDepth(sc, vec2(dx*x, dy*y));
+            count++;
+        }
+    }
+    depth /= count;
+    if(depth < 0.001f) return 1.f;
+
+    scale = (sc.z - depth) / depth;
+    dx = scale * 1.0 / float(texDim.x);
+    dy = scale * 1.0 / float(texDim.y);
+
+    float shadowFactor = 0.0;
+    count = 0;
+    for (int x = -range; x <= range; x++)
+    {
+        for (int y = -range; y <= range; y++)
+        {
+            shadowFactor += textureProj(sc, vec2(dx*x, dy*y));
+            count++;
+        }
+
+    }
+    return shadowFactor / count;
+}
 void main() {
 
     float visibility;
     vec3 proj_coord = pos_from_light.xyz / pos_from_light.w;
     vec3 shadowCoord = proj_coord*0.5f +0.5f;
-//    frag_color = vec4(shadowCoord,1.f);return;
-    // visibility = useShadowMap(ShadowMap,vec4(shadowCoord,1.f));
-    visibility = filterPCF(vec4(shadowCoord,1.f));
-    // visibility = textureProj(vec4(shadowCoord,1.f),vec2(0.f));
+    if(shadow_mode == 1)
+        visibility = filterPCF(vec4(shadowCoord,1.f));
+    else if(shadow_mode == 2)
+        visibility = filterPCSS(vec4(shadowCoord,1.f));
+    else if(shadow_mode == 0)
+        visibility = useShadowMap(ShadowMap,vec4(shadowCoord,1.f));
+    else
+        visibility = 1.f;
     vec3 phongColor = blinnPhong();
 
     frag_color = vec4(phongColor * visibility,1.f);

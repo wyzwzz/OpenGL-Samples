@@ -64,16 +64,26 @@ class ShadowMapApplication final: public Demo{
         GL_CHECK
     }
     void initResource() override{
-        
+        gl->SetWindowTitle("ShadowMap");
         glEnable(GL_DEPTH_TEST);
 
         auto marry = load_mesh_from_obj("C:\\Users\\wyz\\projects\\OpenGL-Samples\\data\\mary\\Marry.obj");
-        
-        models.emplace_back();
-        auto& marry_model = models.back();
-        marry_model.draw_count = marry.indices.size();
-        createVertexBuffer(marry,marry_model.vao,marry_model.vbo,marry_model.ebo);
-        loadTexture("C:/Users/wyz/projects/OpenGL-Samples/data/mary/MC003_Kozakura_Mari.png",marry_model.tex);
+
+        for(int i = 0;i<9;i++)
+        {
+            models.emplace_back();
+            auto &marry_model = models.back();
+            marry_model.draw_count = marry.indices.size();
+            auto t_marry = marry;
+            int r = i / 3 - 1;
+            int c = i % 3 - 1;
+            auto model_matrix = glm::translate(glm::mat4(1.f),glm::vec3(r*3,0,c*3));
+            for(auto& v:t_marry.vertices){
+                v.pos = model_matrix * glm::vec4(v.pos,1.f);
+            }
+            createVertexBuffer(t_marry, marry_model.vao, marry_model.vbo, marry_model.ebo);
+            loadTexture("C:/Users/wyz/projects/OpenGL-Samples/data/mary/MC003_Kozakura_Mari.png", marry_model.tex);
+        }
 
         auto floor = load_mesh_from_obj("C:/Users/wyz/projects/OpenGL-Samples/data/floor/floor.obj");
         models.emplace_back();
@@ -160,7 +170,7 @@ class ShadowMapApplication final: public Demo{
         vec3f direction;
         vec3f incidence;//color rgb
     } light;
-
+    float light_pitch = 45.f;
 
     std::unique_ptr<Shader> shadow_shader;
     std::unique_ptr<Shader> phong_shader;
@@ -182,6 +192,7 @@ class ShadowMapApplication final: public Demo{
         GL::GLFramebuffer fbo;
         GL::GLRenderbuffer rbo;
         GL::GLTexture tex;
+        int method = 0;//0 for general, 1 for PCF, 2 for
     }shadow;
 
     const int shadow_w=4096,shadow_h=4096;
@@ -189,6 +200,10 @@ class ShadowMapApplication final: public Demo{
 void ShadowMapApplication::render_imgui(){
     ImGui::Text("ShadowMap");
     ImGui::Text("FPS %.2f",ImGui::GetIO().Framerate);
+    ImGui::SliderFloat("light pitch",&light_pitch,20.f,90.f,"%.0f");
+    ImGui::RadioButton("General",&shadow.method,0);
+    ImGui::RadioButton("PCF",&shadow.method,1);
+    ImGui::RadioButton("PCSS",&shadow.method,2);
 }
 void ShadowMapApplication::render_frame()
 {
@@ -200,13 +215,13 @@ void ShadowMapApplication::render_frame()
     glViewport(0,0,shadow_w,shadow_h);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
-    static float pitch = 3.1415926f * 0.25f;
+    float pitch = light_pitch / 180.f * 3.1415926f;
     float yaw = glfwGetTime();
     float y = std::sin(pitch);
     float x = std::cos(pitch) * std::cos(yaw);
     float z = std::cos(pitch) * std::sin(yaw);
     auto light_view = glm::lookAt(glm::vec3{x,y,z} * 5.f,{0.f,0.f,0.f},glm::normalize(glm::vec3{-1.f,1.f,0.f}));
-//    auto light_projection = glm::perspective(glm::radians(60.f),float(shadow_w)/shadow_h,0.1f,10.f);
+//    auto light_projection = glm::perspective(glm::radians(30.f),float(shadow_w)/shadow_h,0.1f,50.f);
     auto light_projection = glm::ortho(-15.f,15.f,-15.f,15.f,0.1f,20.f);
     auto light_mvp = light_projection*light_view;
     shadow_shader->use();
@@ -232,6 +247,7 @@ void ShadowMapApplication::render_frame()
     phong_shader->setVec3("camera_pos",camera->getCameraPos());
     phong_shader->setInt("ShadowMap",0);
     phong_shader->setInt("AlbedoMap",1);
+    phong_shader->setInt("shadow_mode",shadow.method);
     for(int i = 0;i<models.size();i++){
         glBindTextureUnit(1,models[i].tex);
         GL_EXPR(glBindVertexArray(models[i].vao));

@@ -33,6 +33,43 @@ float SimpleShadowMap(){
     }
     return 0.f;
 }
+float textureProj(vec4 shadowCoord, vec2 off)
+{
+	float shadow = 1.0;
+	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 ) 
+	{
+        float bias = 0.001;
+		float dist = texture( ShadowMap, shadowCoord.st + off ).r;
+		if ( shadowCoord.w > 0.0 && dist < shadowCoord.z - bias) 
+		{
+			shadow = 0.005;
+		}
+	}
+	return shadow;
+}
+float filterPCF(vec4 sc)
+{
+	ivec2 texDim = textureSize(ShadowMap, 0);
+	float scale = 1.0;
+	float dx = scale * 1.0 / float(texDim.x);
+	float dy = scale * 1.0 / float(texDim.y);
+
+	float shadowFactor = 0.0;
+	int count = 0;
+	int range = 1;
+	
+	for (int x = -range; x <= range; x++)
+	{
+		for (int y = -range; y <= range; y++)
+		{
+			shadowFactor += textureProj(sc, vec2(dx*x, dy*y));
+			count++;
+		}
+	
+	}
+	return shadowFactor / count;
+}
+
 void LocalBasis(vec3 n, out vec3 b1, out vec3 b2) {
     float sign_ = sign(n.z);
     if (n.z == 0.0) {
@@ -52,7 +89,8 @@ vec3 ApplyTangentNormalMap() {
     return nt;
 }
 void main(){
-    GDiffuse = vec4(texture(DiffuseMap,inFragTexCoord).rgb,1.f);
+    vec3 albedo = texture(DiffuseMap,inFragTexCoord).rgb;
+    GDiffuse = vec4(albedo,1.f);
 
     GPos = vec4(inFragPos,1.f);
 
@@ -60,5 +98,7 @@ void main(){
 
     GDepth = gl_FragCoord.z;
 
-    GShadow = SimpleShadowMap();
+    vec3 proj_coord = inPosFromLight.xyz / inPosFromLight.w;
+    vec3 shadow_coord = proj_coord*0.5f+0.5f;
+    GShadow = filterPCF(vec4(shadow_coord,1.f));
 }

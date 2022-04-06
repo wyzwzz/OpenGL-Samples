@@ -4,6 +4,8 @@
 #include <demo.hpp>
 #include <logger.hpp>
 #include <shader_program.hpp>
+#include <imgui.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -55,10 +57,13 @@ class SSRTApplication final: public Demo{
 
   private:
     void initResource() override{
+        gl->SetWindowTitle("SSRT");
+        camera = std::make_unique<control::FPSCamera>(glm::vec3{4.19f,1.03f,2.07f});
+
         glEnable(GL_DEPTH_TEST);
         //init light
         {
-            light.radiance = glm::vec3(6.f,6.f,6.f);
+            light.radiance = glm::vec3(4.5f,4.5f,4.5f);
             light.direction = glm::normalize(glm::vec3{0.4,-0.9f,0.2f});
         }
         //load model
@@ -99,10 +104,10 @@ class SSRTApplication final: public Demo{
     void createScreenQuad();
     void createSampler();
 
-    void  render_frame() override;
+    void render_frame() override;
+    void render_imgui() override;  
 
-
-
+    void process_input() override;
   private:
     struct Light{
         glm::vec3 direction;
@@ -153,16 +158,58 @@ class SSRTApplication final: public Demo{
         GL::GLBuffer screen_quad_vbo;
         std::unique_ptr<Shader> shader;
     }screen_quad;
+
+    int draw_model = -1;
 };
+void SSRTApplication::render_imgui(){
+    ImGui::Text("Screen Space Ray Tracing");
+    ImGui::Text("FPS: %.2f",ImGui::GetIO().Framerate);
+    ImGui::RadioButton("GBuffer-Diffuse",&draw_model,0);
+    ImGui::RadioButton("GBuffer-Position",&draw_model,1);
+    ImGui::RadioButton("GBuffer-Normal",&draw_model,2);
+    ImGui::RadioButton("GBuffer-Depth",&draw_model,3);
+    ImGui::RadioButton("GBuffer-Shadow",&draw_model,4);
+    ImGui::RadioButton("Direct-Color",&draw_model,5);
+    ImGui::RadioButton("InDirect-Color",&draw_model,6);
+    ImGui::RadioButton("Compisite-Color",&draw_model,7);
+}
+void SSRTApplication::process_input(){
+        static auto t = glfwGetTime();
+        auto cur_t = glfwGetTime();
+        auto delta_t = cur_t - t;
+        t = cur_t;
+        static auto last_t = t;
+        light.direction.x = sin(last_t);
+        light.direction.y = -3.f;
+        light.direction.z = cos(last_t);
+        light.direction = glm::normalize(light.direction);
+
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_W))
+        camera->processKeyEvent(control::CameraDefinedKey::Forward,delta_t);
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_S))
+        camera->processKeyEvent(control::CameraDefinedKey::Backward,delta_t);
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_A))
+        camera->processKeyEvent(control::CameraDefinedKey::Left,delta_t);
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_D))
+        camera->processKeyEvent(control::CameraDefinedKey::Right,delta_t);
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_Q))
+        camera->processKeyEvent(control::CameraDefinedKey::Up,delta_t);
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_E))
+        camera->processKeyEvent(control::CameraDefinedKey::Bottom,delta_t);
+        if(glfwGetKey(gl->GetWindow(),GLFW_KEY_R)){
+            last_t = t;
+        }
+}
 void SSRTApplication::render_frame()
 {
+    process_input();
     glClearColor(0.f,0.f,0.f,0.f);
 
-    static glm::vec3 world_up = glm::vec3(0.f,1.f,0.f);
-    static glm::vec3 camera_pos = glm::vec3{4.19f,1.03f,2.07f};
-    static glm::vec3 camera_target = glm::vec3{2.92f,0.98f,1.55f};
-    static glm::vec3 camera_right = glm::normalize(glm::cross(camera_target-camera_pos,world_up));
-    static glm::vec3 camera_up = glm::normalize(glm::cross(camera_right,camera_target-camera_pos));
+    static glm::vec3 world_up = glm::vec3{0.f,1.f,0.f};
+    glm::vec3 camera_pos =camera->getCameraPos();
+    glm::vec3 camera_target =camera->getCameraLookAt();;
+    glm::vec3 camera_right = camera->getCameraRight();
+    glm::vec3 camera_up = camera->getCameraUp();
     glm::mat4 light_mvp;
     glm::mat4 camera_mvp;
     //shadow map
@@ -224,7 +271,7 @@ void SSRTApplication::render_frame()
             shading.direct_shader->setVec3("LightDir",light.direction);
             shading.direct_shader->setVec3("CameraPos",camera_pos);
             shading.direct_shader->setVec3("LightRadiance",light.radiance);
-            shading.direct_shader->setVec3("ks",glm::vec3{0.8f,0.8f,0.8f});
+            shading.direct_shader->setVec3("ks",glm::vec3{0.3f,0.3f,0.3f});
         }
         glDrawBuffer(GL_COLOR_ATTACHMENT5);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -264,7 +311,7 @@ void SSRTApplication::render_frame()
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         {
             screen_quad.shader->use();
-            screen_quad.shader->setInt("DrawModel",7);
+            screen_quad.shader->setInt("DrawModel",draw_model);
         }
         glBindVertexArray(screen_quad.screen_quad_vao);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -283,8 +330,8 @@ void SSRTApplication::loadModel()
     LOG_INFO("{}",__FUNCTION__ );
     const std::string assetPath = "C:/Users/wyz/projects/OpenGL-Samples/data/";
     const std::string modelPath = "cave/cave.obj";
-    const std::string normalPath = "cave/siEoZ_2K_Normal_LOD0.jpg";
-    const std::string albedoPath = "cave/siEoZ_2K_Albedo.jpg";
+    const std::string normalPath = "cave/normal.jpg";
+    const std::string albedoPath = "cave/albedo.jpg";
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -339,6 +386,7 @@ void SSRTApplication::loadModel()
     glBindVertexArray(0);
 
     LOG_INFO("load vertex size: {}, index size: {}",model.vertices.size(),model.indices.size());
+    stbi_set_flip_vertically_on_load(true);
     //load texture
     int texWidth,texHeight,texChannels;
     auto pixels = stbi_load((assetPath+normalPath).c_str(),&texWidth,&texHeight,&texChannels,STBI_rgb);
