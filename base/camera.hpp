@@ -375,10 +375,10 @@ inline void FPSCamera::processMouseMove(double x_pos, double y_pos)
     yaw += xoffset;
     pitch += yoffset;
 
-    if (pitch > 60.0f)
-        pitch = 60.0f;
-    if (pitch < -60.0f)
-        pitch = -60.0f;
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
 
     updateVector();
 }
