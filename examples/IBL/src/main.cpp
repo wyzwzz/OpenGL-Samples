@@ -123,6 +123,9 @@ static void CreateTexture(const std::shared_ptr<GL>& gl,GL::GLTexture& tex,const
     else{
         LOG_ERROR("Load texture {} failed!",path);
     }
+    char* (*str)[2] = nullptr;
+    char* s[] = {nullptr,nullptr};
+    str = &s;
 }
 
 static void CreateCube(const std::shared_ptr<GL>& gl,GL::GLVertexArray& vao,GL::GLBuffer& vbo){

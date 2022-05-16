@@ -14,3 +14,5 @@ add_subdirectory(Kulla-ContyBRDF)
 add_subdirectory(NaiveVolumetricAtmospheric)
 
 add_subdirectory(Bloom)
+
+add_subdirectory(CUDAGLVolumetricPathTracer)
