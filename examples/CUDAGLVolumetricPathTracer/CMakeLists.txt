@@ -26,3 +26,9 @@ target_include_directories(
         PRIVATE
         ${CUDA_INCLUDE_DIRS}
 )
+
+target_compile_features(
+        CUDAGLVPT
+        PRIVATE
+        cxx_std_14
+)

@@ -111,9 +111,7 @@ static void createVolumeTransferFunction(cudaTextureObject_t* tf_tex,cudaArray_t
 
     cudaTextureDesc tex_desc;
     memset(&tex_desc, 0, sizeof(tex_desc));
-    tex_desc.addressMode[0]   = cudaAddressModeWrap;
-    tex_desc.addressMode[1]   = cudaAddressModeClamp;
-    tex_desc.addressMode[2]   = cudaAddressModeWrap;
+    tex_desc.addressMode[0]   = cudaAddressModeClamp;
     tex_desc.filterMode       = cudaFilterModeLinear;
     tex_desc.readMode         = cudaReadModeElementType;
     tex_desc.normalizedCoords = 1;
@@ -178,8 +176,8 @@ void VBTApplication::initCUDAResource()
     loadVolume(volume,VOLUME_PATH);
     createVolume(&cuda_resource.kernel_params.volume_tex,&cuda_resource.volume_array,volume);
 
-    std::vector<float4> tf(256);
-    for(int i = 0; i < 256;i ++){
+    std::vector<float4> tf(256, make_float4(0.f,0.f,0.f,0.f));
+    for(int i = 127; i < 256;i ++){
         float x = 1.f * i / 255.f;
         tf[i] = make_float4(x,x,x,x);
     }
@@ -231,22 +229,16 @@ void VBTApplication::updateCamera()
     auto cam_right = camera->getCameraRight();
     auto cam_up = camera->getCameraUp();
     auto cam_zoom = camera->getZoom();
-    if(first){
 
+    if(first || cam_pos != last_cam_pos || cam_dir != last_cam_dir || cam_right != last_cam_right
+        || cam_up != last_cam_up || cam_zoom != last_camera_zoom){
         first = false;
-    }
-    else{
-        if(cam_pos != last_cam_pos || cam_dir != last_cam_dir || cam_right != last_cam_right
-            || cam_up != last_cam_up || cam_zoom != last_camera_zoom){
-            cuda_resource.kernel_params.iteration = 0;
-        }
-        else{
-            cuda_resource.kernel_params.cam_pos = make_float3(cam_pos.x,cam_pos.y,cam_pos.z);
-            cuda_resource.kernel_params.cam_dir = make_float3(cam_dir.x,cam_dir.y,cam_dir.z);
-            cuda_resource.kernel_params.cam_right = make_float3(cam_right.x,cam_right.y,cam_right.z);
-            cuda_resource.kernel_params.cam_up = make_float3(cam_up.x,cam_up.y,cam_up.z);
-            cuda_resource.kernel_params.cam_focal = float(1.0 / tan(cam_zoom / 2.0 * (2.0 * M_PI / 360.0)));
-        }
+        cuda_resource.kernel_params.iteration = 0;
+        cuda_resource.kernel_params.cam_pos = make_float3(cam_pos.x,cam_pos.y,cam_pos.z);
+        cuda_resource.kernel_params.cam_dir = make_float3(cam_dir.x,cam_dir.y,cam_dir.z);
+        cuda_resource.kernel_params.cam_right = make_float3(cam_right.x,cam_right.y,cam_right.z);
+        cuda_resource.kernel_params.cam_up = make_float3(cam_up.x,cam_up.y,cam_up.z);
+        cuda_resource.kernel_params.cam_focal = float(1.0 / tan(cam_zoom / 2.0 * (2.0 * M_PI / 360.0)));
     }
     last_cam_pos = cam_pos;
     last_cam_dir = cam_dir;
@@ -284,6 +276,7 @@ void VBTApplication::render_frame()
     glBindTexture(GL_TEXTURE_2D,frame.color_attachment);
     glTexSubImage2D(GL_TEXTURE_2D,0,0,0,frame.width,frame.height,GL_BGRA,GL_UNSIGNED_BYTE,NULL);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER,0);
+    glFinish();
     GL_CHECK
 
 

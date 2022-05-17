@@ -3,6 +3,7 @@
 //
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <iostream>
 #include "volume_kernel.cuh"
 #include "helper_math.h"
 
@@ -38,9 +39,9 @@ __device__ inline float get_extinction(
 
         float scalar = tex3D<float>(kernel_params.volume_tex,pos.x,pos.y,pos.z);
 
-//        float4 value = tex1D<float4>(kernel_params.volume_tf_tex,scalar);
-
-//        return value.w * kernel_params.max_extinction;
+        float4 value = tex1D<float4>(kernel_params.volume_tf_tex,scalar);
+//        printf("scalar: %f, value w: %f\n",scalar,value.w);
+        return value.w < 0.001f ? 0.f : kernel_params.max_extinction;
 
         if(scalar < 0.2f) return 0.f;
         else return kernel_params.max_extinction;
@@ -85,21 +86,9 @@ __device__ inline float3 trace_volume(
             float scalar = tex3D<float>(kernel_params.volume_tex,volume_sample_pos.x,volume_sample_pos.y,volume_sample_pos.z);
             float4 value = tex1D<float4>(kernel_params.volume_tf_tex,scalar);
             w *= make_float3(value.x,value.y,value.z);
-//            w *= (1.f - scalar);
-//            if (w < 0.2f) {
-//                if (rand(&rand_state) > w * 5.0f) {
-//                    return make_float3(0.0f, 0.0f, 0.0f);
-//                }
-//                w = 0.2f;
-//            }
 
             float t = max(w.x,max(w.y,w.z));
-//            if(t < 0.2f){
-//                if(rand(&rand_state) > t * 5.f){
-//                    return make_float3(0.f);
-//                }
-//                w = make_float3(0.2f);
-//            }
+
             if(t < 0.7f && num_interactions > 5){
                 float q = max(0.05f,1.f - t);
                 if(rand(&rand_state) < q)
@@ -117,7 +106,6 @@ __device__ inline float3 trace_volume(
         }
     }
 
-//    w = make_float3(1.f);
     const float4 texval = tex2D<float4>(
         kernel_params.env_tex,
         atan2f(ray_dir.z, ray_dir.x) * (float)(0.5 / M_PI) + 0.5f,
@@ -133,6 +121,7 @@ __global__ void volume_rt_kernel(VolumeKernelParams kernel_params)
         return;
 
     const unsigned int idx = y * kernel_params.resolution.x + x;
+
     Rand_state rand_state;
     curand_init(idx, 0, kernel_params.iteration * 4096, &rand_state);
 
@@ -142,7 +131,7 @@ __global__ void volume_rt_kernel(VolumeKernelParams kernel_params)
     const float pu = (2.0f * ((float)y + rand(&rand_state)) * inv_res_y - 1.0f);
     const float aspect = (float)kernel_params.resolution.y * inv_res_x;
     float3 ray_pos = kernel_params.cam_pos;
-    float3 ray_dir = normalize(kernel_params.cam_dir * kernel_params.cam_focal + kernel_params.cam_right * pr + kernel_params.cam_up * aspect * pu);
+    float3 ray_dir = normalize(kernel_params.cam_dir * kernel_params.cam_focal + kernel_params.cam_right * pr - kernel_params.cam_up * aspect * pu);
 
 
     const float3 value = trace_volume(rand_state, ray_pos, ray_dir, kernel_params);
