@@ -18,3 +18,5 @@ add_subdirectory(Bloom)
 add_subdirectory(CUDAGLVolumetricPathTracer)
 
 add_subdirectory(ClusteredShading)
+
+add_subdirectory(ASR)
