@@ -3,7 +3,7 @@
 //
 #include <demo.hpp>
 #include <shader_program.hpp>
-#define STB_IMAGE_IMPLEMENTATION
+//#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <logger.hpp>
 #include <imgui.h>
@@ -66,6 +66,8 @@ class ShadowMapApplication final: public Demo{
     void initResource() override{
         gl->SetWindowTitle("ShadowMap");
         glEnable(GL_DEPTH_TEST);
+
+        auto view = glm::lookAt(vec3f(0,0,2),vec3f(0,0,0),vec3f(0,1,0));
 
         auto marry = load_mesh_from_obj("C:\\Users\\wyz\\projects\\OpenGL-Samples\\data\\mary\\Marry.obj");
 

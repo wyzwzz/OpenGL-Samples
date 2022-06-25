@@ -134,8 +134,9 @@ __global__ void volume_rt_kernel(VolumeKernelParams kernel_params)
     float3 ray_dir = normalize(kernel_params.cam_dir * kernel_params.cam_focal + kernel_params.cam_right * pr - kernel_params.cam_up * aspect * pu);
 
 
-    const float3 value = trace_volume(rand_state, ray_pos, ray_dir, kernel_params);
-
+    float3 value = trace_volume(rand_state, ray_pos, ray_dir, kernel_params);
+//    value = ray_dir;
+//    value = ray_pos;
     if (kernel_params.iteration == 0)
         kernel_params.accum_buffer[idx] = value;
     else

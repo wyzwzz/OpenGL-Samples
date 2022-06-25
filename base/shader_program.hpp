@@ -13,12 +13,14 @@ namespace gl
 class Shader
 {
   private:
-    unsigned int ID;
+    unsigned int ID = 0;
 
   public:
     Shader(const char *vertexPath, const char *fragmentPath, const char *geometryPath = nullptr);
+    Shader(const char *computePath);
     Shader() = default;
     void setShader(const char *vertexShader, const char *fragmentShader, const char *geometryShader);
+    void setShader(const char* computeShader);
     void use();
     void setBool(const std::string &name, bool value) const;
     void setInt(const std::string &name, int value) const;
@@ -119,7 +121,47 @@ inline Shader::Shader(const char *vertexPath, const char *fragmentPath, const ch
     if (geometryPath != nullptr)
         glDeleteShader(gShader);
 }
+Shader::Shader(const char * computePath)
+{
+    if(ID)
+        glDeleteProgram(ID);
+    setShader(computePath);
+}
+void Shader::setShader(const char *computePath)
+{
+    std::string computeCode;
+    std::ifstream cShaderFile;
+    cShaderFile.exceptions(std::ifstream::failbit|std::ifstream::badbit);
 
+    try{
+        cShaderFile.open(computePath);
+        std::stringstream cShaderStream;
+        cShaderStream << cShaderFile.rdbuf();
+
+        cShaderFile.close();
+
+        computeCode = cShaderStream.str();
+
+    }
+    catch (std::ifstream::failure &e)
+    {
+        std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
+    }
+
+    const char* cShaderCode = computeCode.c_str();
+
+    uint32_t cShader;
+    cShader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(cShader,1,&cShaderCode,NULL);
+    glCompileShader(cShader);
+    checkCompileErrors(cShader, "COMPUTE");
+
+    ID = glCreateProgram();
+    glAttachShader(ID,cShader);
+    glLinkProgram(ID);
+    checkCompileErrors(ID,"PROGRAM");
+    glDeleteShader(cShader);
+}
 inline void Shader::use()
 {
     glUseProgram(ID);
@@ -286,5 +328,6 @@ inline void Shader::setIntArray(const std::string &name, int *data, int count)
 {
     glUniform1iv(glGetUniformLocation(ID, name.c_str()), count, data);
 }
+
 
 } // namespace gl

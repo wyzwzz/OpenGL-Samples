@@ -2,6 +2,7 @@ include(${PROJECT_SOURCE_DIR}/third_party/tinyobjloader.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/spdlog.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/glm.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/imgui.cmake)
+include(${PROJECT_SOURCE_DIR}/third_party/tinygltf.cmake)
 file(
         GLOB
         BASE_SRC
@@ -29,6 +30,7 @@ target_link_libraries(
         glm
         spdlog::spdlog
         imgui
+        tinygltf
 )
 target_include_directories(
         base

@@ -5,6 +5,12 @@
 #include <glm/gtx/hash.hpp>
 #include <unordered_map>
 
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+// #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
+#include "tiny_gltf.h"
+
 namespace std
 {
 template <> struct hash<gl::vertex_t>
@@ -171,4 +177,36 @@ std::vector<triangle_t> load_triangles_from_obj(const std::string &filename)
     return triangles;
 }
 
+
+Mesh load_mesh_from_gltf(const std::string& filename){
+    std::string path = filename;
+    auto ext_idx = path.find_last_of('.');
+    if (ext_idx == std::string::npos) {
+        throw std::runtime_error("should have extension");
+    }
+    auto ext = path.substr(ext_idx);
+    if (ext != ".glb" && ext != ".gltf") {
+        throw std::runtime_error("Only support GLTF/GLB format.");
+    }
+
+    tinygltf::TinyGLTF loader;
+    tinygltf::Model gltf_model;
+    std::string err, warn;
+    if (ext == ".glb") {
+        loader.LoadBinaryFromFile(&gltf_model, &err, &warn, path);
+    } else {
+        loader.LoadASCIIFromFile(&gltf_model, &err, &warn, path);
+    }
+    if (!err.empty()) {
+        throw std::runtime_error("Failed to load model: " + err);
+    }
+    if (!warn.empty()) {
+        LOG_ERROR("Loading model warning: ");
+    }
+
+    gltf_model.bufferViews;
+
+}
+
 } // namespace gl
+

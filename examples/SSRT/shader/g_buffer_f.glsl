@@ -90,7 +90,7 @@ vec3 ApplyTangentNormalMap() {
 }
 void main(){
     vec3 albedo = texture(DiffuseMap,inFragTexCoord).rgb;
-    GDiffuse = vec4(albedo,1.f);
+    GDiffuse = vec4(pow(albedo,vec3(2.2)),1.f);
 
     GPos = vec4(inFragPos,1.f);
 

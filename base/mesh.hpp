@@ -39,7 +39,10 @@ struct Mesh
     std::string name;
     std::vector<vertex_t> vertices;
     std::vector<uint32_t> indices;
+
 };
+
+Mesh load_mesh_from_gltf(const std::string& filename);
 
 Mesh load_mesh_from_obj(const std::string &filename);
 
