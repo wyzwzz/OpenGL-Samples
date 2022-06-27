@@ -1,5 +1,5 @@
 file(
-        GLOB
+        GLOB_RECURSE
         ASR_SRCS
         "*.cpp"
         "*.c"
@@ -15,6 +15,9 @@ target_link_libraries(
         PRIVATE
         base
 )
+
+target_include_directories(ASR PRIVATE cy)
+
 target_compile_features(
         ASR
         PRIVATE
