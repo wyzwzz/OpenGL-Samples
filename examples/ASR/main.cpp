@@ -12,6 +12,81 @@
 #include <cyPoint.h>
 #include <cySampleElim.h>
 using namespace glm;
+
+static const float PI = 3.14159265359f;
+struct Sphere{
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec2> uv;
+    std::vector<glm::vec3> normals;
+    std::vector<uint32_t> indices;
+};
+static Sphere MakeSphere(){
+    static constexpr uint32_t X_SEGMENTS = 64;
+    static constexpr uint32_t Y_SEGMENTS = 64;
+    static constexpr float PI = 3.14159265359f;
+
+    Sphere sphere;
+
+    for(uint32_t y = 0; y <= Y_SEGMENTS; y++){
+        for(uint32_t x = 0; x <= X_SEGMENTS; x++){
+            float x_segment = static_cast<float>(x) / X_SEGMENTS;
+            float y_segment = static_cast<float>(y) / Y_SEGMENTS;
+            float x_pos = std::cos(x_segment * 2.f * PI) * std::sin(y_segment * PI);
+            float y_pos = std::cos(y_segment * PI);
+            float z_pos = std::sin(x_segment * 2.f * PI) * std::sin(y_segment * PI);
+
+            sphere.positions.emplace_back(x_pos,y_pos,z_pos);
+            sphere.uv.emplace_back(x_segment,y_segment);
+            sphere.normals.emplace_back(x_pos,y_pos,z_pos);
+        }
+    }
+    //use GL_TRIANGLE_STRIP
+    bool odd_row = false;
+    for(uint32_t y = 0; y < Y_SEGMENTS; y++){
+        if(!odd_row){
+            for(uint32_t x = 0; x <= X_SEGMENTS; x++){
+                sphere.indices.emplace_back( y    * (X_SEGMENTS + 1) + x);
+                sphere.indices.emplace_back((y+1) * (X_SEGMENTS + 1) + x);
+            }
+        }
+        else{
+            for(int x = X_SEGMENTS; x>=0; x--){
+                sphere.indices.emplace_back((y + 1) * (X_SEGMENTS + 1) + x);
+                sphere.indices.emplace_back( y      * (X_SEGMENTS + 1) + x);
+            }
+        }
+        odd_row = !odd_row;
+    }
+
+    return sphere;
+}
+static void CreateSphere(const std::shared_ptr<GL>& gl,GL::GLVertexArray& vao,GL::GLBuffer& vbo,GL::GLBuffer& ebo,int& index_count){
+    auto sphere = MakeSphere();
+    index_count = sphere.indices.size();
+    vao = gl->CreateVertexArray();
+    GL_EXPR(glBindVertexArray(vao));
+    vbo = gl->CreateBuffer();
+    ebo = gl->CreateBuffer();
+
+    GL_EXPR(glBindBuffer(GL_ARRAY_BUFFER,vbo));
+    assert(sphere.positions.size()==sphere.normals.size() && sphere.normals.size() == sphere.uv.size());
+    auto vertex_count = sphere.positions.size();
+    GL_EXPR(glBufferData(GL_ARRAY_BUFFER,vertex_count*sizeof(float)*8,nullptr,GL_STATIC_DRAW));
+    GL_EXPR(glBufferSubData(GL_ARRAY_BUFFER,0,vertex_count*3*sizeof(float),sphere.positions.data()));
+    GL_EXPR(glBufferSubData(GL_ARRAY_BUFFER,vertex_count*3*sizeof(float),vertex_count*3*sizeof(float),sphere.normals.data()));
+    GL_EXPR(glBufferSubData(GL_ARRAY_BUFFER,vertex_count*6*sizeof(float),vertex_count*2*sizeof(float),sphere.uv.data()));
+    GL_EXPR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,ebo));
+    GL_EXPR(glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_count*sizeof(uint32_t),sphere.indices.data(),GL_STATIC_DRAW));
+    GL_EXPR(glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0));
+    GL_EXPR(glEnableVertexAttribArray(0));
+    GL_EXPR(glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)(vertex_count*3*sizeof(float))));
+    GL_EXPR(glEnableVertexAttribArray(1));
+    GL_EXPR(glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,2*sizeof(float),(void*)(vertex_count*6*sizeof(float))));
+    GL_EXPR(glEnableVertexAttribArray(2));
+    GL_EXPR(glBindVertexArray(0));
+}
+
+
 class ASRApplication: public Demo{
   public:
     ASRApplication() = default;
@@ -33,7 +108,11 @@ class ASRApplication: public Demo{
 
     void setupAerialLUT();
 
+    void setupMesh();
+
     void setupSkyView();
+
+    void setupSunDisk();
 
     void generateShadowMap(const mat4& vp);
 
@@ -43,11 +122,11 @@ class ASRApplication: public Demo{
 
     void updateFrustumDirs(const mat4& inv_view_proj);
 
-    void renderMeshes(const vec3f& sun_dir,const vec3f& sun_radiance,const mat4& sun_vp);
+    void renderMeshes(const vec3f& sun_dir,const vec3f& sun_radiance,const mat4& sun_vp,const mat4& camera_vp);
 
     void renderSky();
 
-    void renderSunDisk(const vec3f& sun_dir,const vec3f& sun_radiance);
+    void renderSunDisk(const vec3f& sun_dir,const vec3f& sun_radiance,const mat4& camera_vp);
   private:
 
     vec2i transmittance_lut_size = {256,256};
@@ -62,6 +141,8 @@ class ASRApplication: public Demo{
     bool enable_shadow = true;
     bool enable_sun_disk = true;
     bool enalbe_multiscattering = true;
+
+    float max_aerial_distance = 3000;
 
     struct{
         float sun_x_degree = 0.f;
@@ -93,7 +174,18 @@ class ASRApplication: public Demo{
 
     GL::GLSampler lut_sampler;
 
+    struct MeshParams{
+        vec3 sun_dir;
+        float sun_theta;
+        vec3 sun_intensity;
+        float max_aeraial_distance;
+        vec3 view_pos;
+        float world_scale;
+        mat4 shadow_vp;
+    }mesh_params;
     std::unique_ptr<Shader> mesh_shader;
+    GL::GLBuffer mesh_buffer;
+    GL::GLTexture mesh_albedo_tex;
     struct{
         GL::GLVertexArray vao;
         GL::GLBuffer vbo;
@@ -151,7 +243,8 @@ class ASRApplication: public Demo{
         int enable_shadow;
         mat4 shadow_vp;
         float world_scale;
-        float padding[3];
+        int slice_z_count = 32;
+        float padding[2];
     }aerial_params;
     static_assert(sizeof(AerialParams) == 176,"");
     std::unique_ptr<Shader> aerial_lut_shader;
@@ -169,16 +262,27 @@ class ASRApplication: public Demo{
     std::unique_ptr<Shader> sky_shader;
     GL::GLBuffer sky_view_buffer;
 
-
+    int sun_disk_segment_count = 64;
     std::unique_ptr<Shader> sun_shader;
+    struct{
+        GL::GLVertexArray vao;
+        GL::GLBuffer vbo;
+        GL::GLBuffer ebo;
+        int index_count;
+        int seg_count ;
+        float radius = 0.04649f;
+    }sun;
+
     std::unique_ptr<Shader> postprocess_shader;
 };
 void ASRApplication::initResource()
 {
     gl->SetVSync(0);
 
-    camera = std::make_unique<control::FPSCamera>(glm::vec3{4.087f,3.7f,3.957f});
+    GL_EXPR(glEnable(GL_DEPTH_TEST));
 
+    camera = std::make_unique<control::FPSCamera>(glm::vec3{4.087f,3.7f,3.957f});
+    camera->setYawPitchDeg(180,0);
     // 0. create some common resources
     std_unit_atmosphere_properties = preset_atmosphere_properties.toStdUnit();
     atmosphere_buffer = gl->CreateBuffer();
@@ -209,9 +313,11 @@ void ASRApplication::initResource()
     setupAerialLUT();
 
     //
-
+    setupMesh();
     //
     setupSkyView();
+
+    setupSunDisk();
 }
 void ASRApplication::generateTransmittanceLUT()
 {
@@ -388,6 +494,20 @@ void ASRApplication::setupAerialLUT()
     aerial_buffer = gl->CreateBuffer();
     GL_EXPR(glNamedBufferData(aerial_buffer,sizeof(AerialParams),nullptr,GL_STATIC_DRAW));
 }
+void ASRApplication::setupMesh()
+{
+    if(!mesh_shader){
+        mesh_shader = std::make_unique<Shader>("mesh.vert","mesh.frag");
+    }
+    mesh_shader->use();
+    mesh_shader->setInt("Transmittance",0);
+    mesh_shader->setInt("AerialPerspective",1);
+    mesh_shader->setInt("ShadowMap",2);
+    mesh_shader->setInt("AlbedoMap",3);
+    mesh_buffer = gl->CreateBuffer();
+    GL_EXPR(glNamedBufferData(mesh_buffer,sizeof(MeshParams),nullptr,GL_STATIC_DRAW));
+
+}
 void ASRApplication::setupSkyView()
 {
     if(!sky_shader){
@@ -397,6 +517,29 @@ void ASRApplication::setupSkyView()
     sky_shader->setInt("SkyView",0);
     sky_view_buffer = gl->CreateBuffer();
     GL_EXPR(glNamedBufferData(sky_view_buffer,sizeof(SkyViewParams),nullptr,GL_STATIC_DRAW));
+}
+std::vector<vec2f> createDiskVertices(int seg_count){
+    std::vector<vec2f> vertices;
+    constexpr float PI = pi<float>();
+    for(int i = 0; i < seg_count; ++i){
+        float phi0 = float(i) / seg_count * 2 * PI;
+        float phi1 = float(i + 1) / seg_count * 2 * PI;
+        vertices.emplace_back(0);
+        vertices.emplace_back(std::cos(phi0),std::sin(phi0));
+        vertices.emplace_back(std::cos(phi1),std::sin(phi1));
+    }
+    return vertices;
+}
+void ASRApplication::setupSunDisk()
+{
+    if(!sun_shader){
+        sun_shader = std::make_unique<Shader>("sun.vert","sun.frag");
+    }
+    sun_shader->use();
+    sun_shader->setInt("Transmittance",0);
+    {
+        CreateSphere(gl,sun.vao,sun.vbo,sun.ebo,sun.index_count);
+    }
 }
 inline float deg2rad(float deg){
     return deg / 180.f * pi<float>();
@@ -409,8 +552,11 @@ void ASRApplication::generateShadowMap(const mat4& vp)
     shadow_shader->setMat4("VP",vp);
     GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,shadow.fbo));
     GL_EXPR(glDrawBuffer(GL_COLOR_ATTACHMENT0));
+    GL_EXPR(glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT));
     GL_EXPR(glBindVertexArray(terrain.vao));
+    GL_EXPR(glViewport(0,0,ShadowMapSize.x,ShadowMapSize.y));
     GL_EXPR(glDrawElements(GL_TRIANGLES,terrain.index_count,GL_UNSIGNED_INT,nullptr));
+    GL_EXPR(glViewport(0,0,window_w,window_h));
     GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,0));
 }
 void ASRApplication::generateSkyLUT(const vec3f& sun_dir,const vec3f& sun_radiance)
@@ -433,7 +579,9 @@ void ASRApplication::generateSkyLUT(const vec3f& sun_dir,const vec3f& sun_radian
     GL_EXPR(glViewport(0,0,sky_lut_size.x,sky_lut_size.y));
     GL_EXPR(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     GL_EXPR(glDrawBuffer(GL_COLOR_ATTACHMENT0));
+    GL_EXPR(glDisable(GL_DEPTH_TEST));
     GL_EXPR(glDrawArrays(GL_TRIANGLE_STRIP,0,4));
+    GL_EXPR(glEnable(GL_DEPTH_TEST));
     GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,0));
     GL_EXPR(glViewport(0,0,window_w,window_h));
 }
@@ -441,7 +589,21 @@ void ASRApplication::generateAerialLUT(const vec3f &sun_dir, const mat4 &sun_vp)
 {
     //update aerial params
     {
-        //todo ...
+        aerial_params.sun_dir = sun_dir;
+        aerial_params.sun_theta = std::asin(-sun_dir.y);
+        aerial_params.frustum_a = frustum_dirs.frustum_a;
+        aerial_params.max_view_distance = max_aerial_distance;
+        aerial_params.frustum_b = frustum_dirs.frustum_b;
+        aerial_params.ray_march_step_count_per_slice = 4;
+        aerial_params.frustum_c = frustum_dirs.frustum_c;
+        aerial_params.enable_multiscattering = enalbe_multiscattering;
+        aerial_params.frustum_d = frustum_dirs.frustum_d;
+        aerial_params.view_height = camera->getCameraPos().y * world_scale;
+        aerial_params.view_pos = camera->getCameraPos();
+        aerial_params.enable_shadow = enable_shadow;
+        aerial_params.shadow_vp = sun_vp;
+        aerial_params.world_scale = world_scale;
+        aerial_params.slice_z_count = aerial_lut_size.z;
         GL_EXPR(glNamedBufferSubData(aerial_buffer,0,sizeof(AerialParams),&aerial_params));
     }
     GL_EXPR(glBindBufferBase(GL_UNIFORM_BUFFER,0,atmosphere_buffer));
@@ -480,9 +642,34 @@ void ASRApplication::updateFrustumDirs(const mat4& inv_view_proj)
     frustum_dirs.frustum_c = normalize(vec3f(C1 / C1.w - C0 / C0.w));
     frustum_dirs.frustum_d = normalize(vec3f(D1 / D1.w - D0 / D0.w));
 }
-void ASRApplication::renderMeshes(const vec3f &sun_dir, const vec3f &sun_radiance, const mat4 &sun_vp)
+void ASRApplication::renderMeshes(const vec3f &sun_dir, const vec3f &sun_radiance, const mat4 &sun_vp,const mat4& camera_vp)
 {
-
+    //update mesh params
+    {
+        mesh_params.sun_dir = sun_dir;
+        mesh_params.sun_theta = std::asin(-sun_dir.y);
+        mesh_params.sun_intensity = sun_radiance;
+        mesh_params.max_aeraial_distance = max_aerial_distance;
+        mesh_params.view_pos = camera->getCameraPos();
+        mesh_params.world_scale = world_scale;
+        mesh_params.shadow_vp = sun_vp;
+        GL_EXPR(glNamedBufferSubData(mesh_buffer,0,sizeof(MeshParams),&mesh_params));
+    }
+    GL_EXPR(glBindBufferBase(GL_UNIFORM_BUFFER,0,atmosphere_buffer));
+    GL_EXPR(glBindBufferBase(GL_UNIFORM_BUFFER,1,mesh_buffer));
+    GL_EXPR(glBindTextureUnit(0,transmittance_lut));
+    GL_EXPR(glBindTextureUnit(1,aerial_lut));
+    GL_EXPR(glBindTextureUnit(2,shadow.shadow_tex));
+    GL_EXPR(glBindTextureUnit(3,mesh_albedo_tex));
+    GL_EXPR(glBindSampler(0,lut_sampler));
+    GL_EXPR(glBindSampler(1,lut_sampler));
+    GL_EXPR(glBindSampler(2,lut_sampler));
+    GL_EXPR(glBindSampler(3,lut_sampler));
+    mesh_shader->use();
+    mesh_shader->setMat4("Model",terrain.local_to_world);
+    mesh_shader->setMat4("NormalModel", transpose(inverse(terrain.local_to_world)));
+    mesh_shader->setMat4("VP",camera_vp);
+    GL_EXPR(glDrawElements(GL_TRIANGLES,terrain.index_count,GL_UNSIGNED_INT,nullptr));
 }
 void ASRApplication::renderSky()
 {
@@ -498,11 +685,29 @@ void ASRApplication::renderSky()
     GL_EXPR(glBindTextureUnit(0,sky_lut));
     GL_EXPR(glBindSampler(0,lut_sampler));
     sky_shader->use();
+    GL_EXPR(glDepthFunc(GL_LEQUAL));
     GL_EXPR(glDrawArrays(GL_TRIANGLE_STRIP,0,4));
+    GL_EXPR(glDepthFunc(GL_LESS));
 }
-void ASRApplication::renderSunDisk(const vec3f &sun_dir, const vec3f &sun_radiance)
+void ASRApplication::renderSunDisk(const vec3f &sun_dir, const vec3f &sun_radiance,const mat4& camera_vp)
 {
-
+    mat4 model = mat4(1);
+    {
+        model = scale(mat4(1.f),vec3f(sun.radius)) * model;
+        model = translate(mat4(1.f),-sun_dir * 10.f) * translate(mat4(1.f),camera->getCameraPos())* model;
+    }
+    GL_EXPR(glBindTextureUnit(0,transmittance_lut));
+    GL_EXPR(glBindBufferBase(GL_UNIFORM_BUFFER,0,atmosphere_buffer));
+    sun_shader->use();
+    sun_shader->setMat4("MVP",camera_vp * model);
+    sun_shader->setFloat("sun_theta",std::asin(-sun_dir.y));
+    sun_shader->setFloat("view_height",camera->getCameraPos().y * world_scale);
+    sun_shader->setVec3("SunRadiance",sun_radiance);
+    GL_EXPR(glBindVertexArray(sun.vao));
+    GL_EXPR(glDepthFunc(GL_LEQUAL));
+    GL_EXPR(glDrawElements(GL_TRIANGLE_STRIP,sun.index_count,GL_UNSIGNED_INT,nullptr));
+    GL_EXPR(glDepthFunc(GL_LESS));
+    GL_EXPR(glBindVertexArray(0));
 }
 void ASRApplication::render_frame()
 {
@@ -530,10 +735,10 @@ void ASRApplication::render_frame()
 
     generateAerialLUT(sun_dir,vp);
 
-    GL_EXPR(glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT));
+//    GL_EXPR(glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT));
 
     if(enable_terrain){
-        renderMeshes(sun_dir,sun_radiance,vp);
+        renderMeshes(sun_dir,sun_radiance,vp,camera_proj * camera_view);
     }
 
     if(enable_sky){
@@ -541,13 +746,20 @@ void ASRApplication::render_frame()
     }
 
     if(enable_sun_disk){
-        renderSunDisk(sun_dir,sun_radiance);
+        renderSunDisk(sun_dir,sun_radiance,camera_proj * camera_view);
     }
 
 }
 void ASRApplication::render_imgui()
 {
     ImGui::Begin("Atmosphere Settings");
+
+    ImGui::Checkbox("Enable Multi Scattering", &enalbe_multiscattering);
+    ImGui::Checkbox("Enable Sky",              &enable_sky);
+    ImGui::Checkbox("Enable Shadow",           &enable_shadow);
+    ImGui::Checkbox("Enable Sun Disk",         &enable_sun_disk);
+    ImGui::Checkbox("Enable Terrain",          &enable_terrain);
+
     ImGui::Text("fps: %f",ImGui::GetIO().Framerate);
     if(ImGui::TreeNode("Sun")){
         ImGui::SliderFloat("Sun Angle X (Degree)",&sun_x_degree,0,360);
@@ -556,12 +768,33 @@ void ASRApplication::render_imgui()
 
         ImGui::TreePop();
     }
+    ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Once);
+    if(ImGui::TreeNode("Sky LUT"))
+    {
 
+        ImGui::TreePop();
+    }
     ImGui::End();
 }
 void ASRApplication::process_input()
 {
+    static auto t = glfwGetTime();
+    auto cur_t = glfwGetTime();
+    auto delta_t = cur_t - t;
+    t = cur_t;
 
+    if(glfwGetKey(gl->GetWindow(),GLFW_KEY_W))
+        camera->processKeyEvent(control::CameraDefinedKey::Forward,delta_t);
+    if(glfwGetKey(gl->GetWindow(),GLFW_KEY_S))
+        camera->processKeyEvent(control::CameraDefinedKey::Backward,delta_t);
+    if(glfwGetKey(gl->GetWindow(),GLFW_KEY_A))
+        camera->processKeyEvent(control::CameraDefinedKey::Left,delta_t);
+    if(glfwGetKey(gl->GetWindow(),GLFW_KEY_D))
+        camera->processKeyEvent(control::CameraDefinedKey::Right,delta_t);
+    if(glfwGetKey(gl->GetWindow(),GLFW_KEY_Q))
+        camera->processKeyEvent(control::CameraDefinedKey::Up,delta_t);
+    if(glfwGetKey(gl->GetWindow(),GLFW_KEY_E))
+        camera->processKeyEvent(control::CameraDefinedKey::Bottom,delta_t);
 }
 
 

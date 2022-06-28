@@ -301,6 +301,15 @@ class FPSCamera : public Camera
     {
         space_ratio = {x, y, z};
     }
+    void setYawPitchDeg(float yaw,float pitch){
+        if (pitch > 89.0f)
+            pitch = 89.0f;
+        if (pitch < -89.0f)
+            pitch = -89.0f;
+        this->yaw = yaw;
+        this->pitch = pitch;
+        updateVector();
+    }
     void processMouseScroll(float yoffset) override;
     void processMouseMove(double x_pos, double y_pos) override;
     void processMouseButton(CameraDefinedMouseButton button, bool press, double x_pos, double y_pos) override

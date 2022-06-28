@@ -23,7 +23,7 @@ layout(std140,binding = 1) uniform AerialParams{
     vec3 sun_dir;
     float sun_theta;
     vec3 frustum_a;
-    float max_view_distance;
+    float max_aerial_distance;
     vec3 frustum_b;
     int ray_march_step_count_per_slice;
     vec3 frustum_c;
@@ -34,6 +34,7 @@ layout(std140,binding = 1) uniform AerialParams{
     int enable_shadow;
     mat4 shadow_vp;
     float world_scale;
+    int slice_z_count;
 };
 
 uniform sampler2D Transmittance;
@@ -41,7 +42,7 @@ uniform sampler2D MultiScattering;
 
 uniform sampler2D ShadowMap;
 
-layout(rgba32f,binding = 0) uniform image3D AerialPerspectiveLUT;
+layout(rgba32f,binding = 0) uniform writeonly image3D AerialPerspectiveLUT;
 
 float relativeLuminance(vec3 c){
     return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -101,6 +102,8 @@ void getSigmaST(float h,out vec3 sigma_s,out vec3 sigma_t){
 }
 void main() {
     ivec3 res = imageSize(AerialPerspectiveLUT);
+    //debug for imageSize returned res.z == 1 for image3D
+    res.z = slice_z_count;
     ivec2 g_index = ivec2(gl_WorkGroupSize.xy * gl_WorkGroupID.xy + gl_LocalInvocationID.xy);
     if(g_index.x >= res.x || g_index.y >= res.y){
         return;
@@ -116,7 +119,7 @@ void main() {
     if(!findClosestIntersectionWithSphere(planet_view_pos,view_dir,ground_radius,max_t)){
         findClosestIntersectionWithSphere(planet_view_pos,view_dir,top_atmosphere_radius,max_t);
     }
-    float slice_depth = max_view_distance / res.z;
+    float slice_depth = max_aerial_distance / res.z;
     float start_t = 0;
     float end_t = min(max_t,0.5 * slice_depth);//special for first slice
 
@@ -140,12 +143,11 @@ void main() {
                 vec3 shadow_pos = view_pos + view_dir * mid_t / world_scale;
                 vec4 shadow_clip_pos = shadow_vp * vec4(shadow_pos, 1.0);
                 vec2 shadow_ndc = shadow_clip_pos.xy / shadow_clip_pos.w;
-                //todo ???
                 vec2 shadow_uv = shadow_ndc * 0.5 + 0.5;
 
                 bool in_shadow = bool(enable_shadow);
-                if(bool(enable_shadow) && clamp(shadow_uv,vec2(0),vec2(1)) == shadow_uv){
-                    float ray_z = shadow_clip_pos.z;
+                if(bool(enable_shadow) && all(equal(clamp(shadow_uv,vec2(0),vec2(1)),shadow_uv))){
+                    float ray_z = shadow_clip_pos.z * 0.5 + 0.5;//opengl z is -1 ~ 1
                     float shadow_z = texture(ShadowMap,shadow_uv).r;
                     in_shadow = ray_z >= shadow_z;
                 }

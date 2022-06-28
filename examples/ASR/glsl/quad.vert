@@ -7,6 +7,6 @@ layout(location = 0) out vec2 oScreenCoord;
 
 void main()
 {
-    gl_Position = vec4(ScreenQuadVertexCoord[gl_VertexID].x,ScreenQuadVertexCoord[gl_VertexID].y,0.0,1.0);
+    gl_Position = vec4(ScreenQuadVertexCoord[gl_VertexID].x,ScreenQuadVertexCoord[gl_VertexID].y,1.0,1.0);
     oScreenCoord = ScreenQuadTexCoord[gl_VertexID];
 }

@@ -47,8 +47,9 @@ void main() {
     vec3 view_dir = mix(mix(frustum_a,frustum_b,iFragTexCoord.x),
                     mix(frustum_c,frustum_d,iFragTexCoord.x),1 - iFragTexCoord.y);
     view_dir = normalize(view_dir);
-    float phi = atan(view_dir.z,view_dir.x) + PI;
-    float u = phi / (2 * PI);
+    float phi = atan(view_dir.z,view_dir.x);
+    float u = (phi < 0 ? phi + 2 * PI : phi) / (2 * PI);
+
 
     float theta = asin(view_dir.y);
     float v = 0.5 + 0.5 * sign(theta) * sqrt(abs(theta) / (PI / 2));
