@@ -5,7 +5,7 @@
 
 namespace gl
 {
-
+using vec4f = glm::vec4;
 using vec3f = glm::vec3;
 using vec2f = glm::vec2;
 using vec2i = glm::vec<2,int>;

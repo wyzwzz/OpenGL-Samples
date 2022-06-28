@@ -29,7 +29,7 @@ class GLFWImpl : public EventListenerTraits
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_DOUBLEBUFFER, true);
 
-        auto pWin = glfwCreateWindow(1280, 720, "GLContext", nullptr, nullptr);
+        auto pWin = glfwCreateWindow(1902, 1080, "OpenGL-Window", nullptr, nullptr);
         if (pWin == nullptr)
         {
             throw std::runtime_error("Failed to create GLFW window");
@@ -42,7 +42,7 @@ class GLFWImpl : public EventListenerTraits
         glfwSetScrollCallback(window.get(), glfwMouseScrollCallback);
         glfwSetKeyCallback(window.get(), glfwKeyCallback);
         glfwSetDropCallback(window.get(), glfwDropFileCallback);
-        glfwSwapInterval(1);
+        glfwSwapInterval(0);
 
     }
 
@@ -214,6 +214,9 @@ class GLFWImpl : public EventListenerTraits
     }
     void Close(){
         glfwSetWindowShouldClose(window.get(),true);
+    }
+    void SetVSync(int vsync){
+        glfwSwapInterval(vsync);
     }
     ~GLFWImpl()
     {

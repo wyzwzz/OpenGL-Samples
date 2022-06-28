@@ -33,17 +33,21 @@ class ASRApplication: public Demo{
 
     void setupAerialLUT();
 
+    void setupSkyView();
+
     void generateShadowMap(const mat4& vp);
 
     void generateSkyLUT(const vec3f& sun_dir,const vec3f& sun_radiance);
 
     void generateAerialLUT(const vec3f& sun_dir,const mat4& sun_vp);
 
+    void updateFrustumDirs(const mat4& inv_view_proj);
+
     void renderMeshes(const vec3f& sun_dir,const vec3f& sun_radiance,const mat4& sun_vp);
 
     void renderSky();
 
-    void renderSunDisk();
+    void renderSunDisk(const vec3f& sun_dir,const vec3f& sun_radiance);
   private:
 
     vec2i transmittance_lut_size = {256,256};
@@ -51,6 +55,7 @@ class ASRApplication: public Demo{
     vec2i sky_lut_size = {64,64};
     vec3i aerial_lut_size = {200,150,32};
     float ground_albedo = 0.3f;
+    float world_scale = 200.f;
 
     bool enable_terrain = true;
     bool enable_sky = true;
@@ -117,8 +122,19 @@ class ASRApplication: public Demo{
     }sky_params;
     static_assert(sizeof(SkyParams) == 48,"");
     std::unique_ptr<Shader> sky_lut_shader;
+    struct{
+        GL::GLFramebuffer fbo;
+        GL::GLRenderbuffer rbo;
+    }sky_lut_frame;
     GL::GLTexture sky_lut;
     GL::GLBuffer sky_buffer;
+
+    struct FrustumDirections{
+        vec3f frustum_a;
+        vec3f frustum_b;
+        vec3f frustum_c;
+        vec3f frustum_d;
+    }frustum_dirs;
 
     struct AerialParams{
         vec3f sun_dir;
@@ -142,12 +158,25 @@ class ASRApplication: public Demo{
     GL::GLTexture aerial_lut;
     GL::GLBuffer aerial_buffer;
 
+
+    struct SkyViewParams{
+        vec3f frustum_a; float pad0;
+        vec3f frustum_b; float pad1;
+        vec3f frustum_c; float pad2;
+        vec3f frustum_d; float pad3;
+    }sky_view_params;
+    static_assert(sizeof(SkyViewParams) == 64,"");
     std::unique_ptr<Shader> sky_shader;
+    GL::GLBuffer sky_view_buffer;
+
+
     std::unique_ptr<Shader> sun_shader;
     std::unique_ptr<Shader> postprocess_shader;
 };
 void ASRApplication::initResource()
 {
+    gl->SetVSync(0);
+
     camera = std::make_unique<control::FPSCamera>(glm::vec3{4.087f,3.7f,3.957f});
 
     // 0. create some common resources
@@ -178,6 +207,11 @@ void ASRApplication::initResource()
     setupSkyLUT();
     // 6. aerial lut
     setupAerialLUT();
+
+    //
+
+    //
+    setupSkyView();
 }
 void ASRApplication::generateTransmittanceLUT()
 {
@@ -324,6 +358,19 @@ void ASRApplication::setupSkyLUT()
 
     sky_buffer = gl->CreateBuffer();
     GL_EXPR(glNamedBufferData(sky_buffer,sizeof(SkyParams),&sky_params,GL_STATIC_DRAW));
+
+    sky_lut_frame.fbo = gl->CreateFramebuffer();
+    GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,sky_lut_frame.fbo));
+    sky_lut_frame.rbo = gl->CreateRenderbuffer();
+    GL_EXPR(glBindRenderbuffer(GL_RENDERBUFFER,sky_lut_frame.rbo));
+    GL_EXPR(glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,sky_lut_size.x,sky_lut_size.y));
+    GL_EXPR(glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_RENDERBUFFER,sky_lut_frame.rbo));
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){
+        std::cerr<<std::hex<<glCheckFramebufferStatus(GL_FRAMEBUFFER)<<std::endl;
+        throw std::runtime_error("Framebuffer object is not complete!");
+    }
+    GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,sky_lut,0));
+    GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,0));
 }
 void ASRApplication::setupAerialLUT()
 {
@@ -341,7 +388,16 @@ void ASRApplication::setupAerialLUT()
     aerial_buffer = gl->CreateBuffer();
     GL_EXPR(glNamedBufferData(aerial_buffer,sizeof(AerialParams),nullptr,GL_STATIC_DRAW));
 }
-
+void ASRApplication::setupSkyView()
+{
+    if(!sky_shader){
+        sky_shader = std::make_unique<Shader>("quad.vert","sky.frag");
+    }
+    sky_shader->use();
+    sky_shader->setInt("SkyView",0);
+    sky_view_buffer = gl->CreateBuffer();
+    GL_EXPR(glNamedBufferData(sky_view_buffer,sizeof(SkyViewParams),nullptr,GL_STATIC_DRAW));
+}
 inline float deg2rad(float deg){
     return deg / 180.f * pi<float>();
 }
@@ -361,7 +417,7 @@ void ASRApplication::generateSkyLUT(const vec3f& sun_dir,const vec3f& sun_radian
 {
     //update sky params
     {
-        sky_params.view_pos = camera->pos;
+        sky_params.view_pos = camera->getCameraPos() * world_scale;
         sky_params.sun_dir = sun_dir;
         sky_params.sun_intensity = sun_radiance;
         GL_EXPR(glNamedBufferSubData(sky_buffer,0,sizeof(SkyParams),&sky_params));
@@ -373,7 +429,13 @@ void ASRApplication::generateSkyLUT(const vec3f& sun_dir,const vec3f& sun_radian
     GL_EXPR(glBindSampler(0,lut_sampler));
     GL_EXPR(glBindSampler(1,lut_sampler));
     sky_lut_shader->use();
-    GL_EXPR(glDrawArrays(GL_TRIANGLES,0,6));
+    GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,sky_lut_frame.fbo));
+    GL_EXPR(glViewport(0,0,sky_lut_size.x,sky_lut_size.y));
+    GL_EXPR(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+    GL_EXPR(glDrawBuffer(GL_COLOR_ATTACHMENT0));
+    GL_EXPR(glDrawArrays(GL_TRIANGLE_STRIP,0,4));
+    GL_EXPR(glBindFramebuffer(GL_FRAMEBUFFER,0));
+    GL_EXPR(glViewport(0,0,window_w,window_h));
 }
 void ASRApplication::generateAerialLUT(const vec3f &sun_dir, const mat4 &sun_vp)
 {
@@ -399,11 +461,54 @@ void ASRApplication::generateAerialLUT(const vec3f &sun_dir, const mat4 &sun_vp)
     GL_EXPR(glDispatchCompute(group_size_x,group_size_y,1));
     GL_EXPR(glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT));
 }
+void ASRApplication::updateFrustumDirs(const mat4& inv_view_proj)
+{
+    const vec4f A0 = inv_view_proj * vec4f(-1, 1, 0.2f, 1);
+    const vec4f A1 = inv_view_proj *vec4f(-1, 1, 0.5f, 1);
+
+    const vec4f B0 = inv_view_proj * vec4f(1, 1, 0.2f, 1);
+    const vec4f B1 = inv_view_proj * vec4f(1, 1, 0.5f, 1);
+
+    const vec4f C0 = inv_view_proj * vec4f(-1, -1, 0.2f, 1);
+    const vec4f C1 = inv_view_proj * vec4f(-1, -1, 0.5f, 1);
+
+    const vec4f D0 = inv_view_proj * vec4f(1, -1, 0.2f, 1);
+    const vec4f D1 = inv_view_proj * vec4f(1, -1, 0.5f, 1);
+
+    frustum_dirs.frustum_a = normalize(vec3f(A1 / A1.w - A0 / A0.w));
+    frustum_dirs.frustum_b = normalize(vec3f(B1 / B1.w - B0 / B0.w));
+    frustum_dirs.frustum_c = normalize(vec3f(C1 / C1.w - C0 / C0.w));
+    frustum_dirs.frustum_d = normalize(vec3f(D1 / D1.w - D0 / D0.w));
+}
+void ASRApplication::renderMeshes(const vec3f &sun_dir, const vec3f &sun_radiance, const mat4 &sun_vp)
+{
+
+}
+void ASRApplication::renderSky()
+{
+    //update sky view params
+    {
+        sky_view_params.frustum_a = frustum_dirs.frustum_a;
+        sky_view_params.frustum_b = frustum_dirs.frustum_b;
+        sky_view_params.frustum_c = frustum_dirs.frustum_c;
+        sky_view_params.frustum_d = frustum_dirs.frustum_d;
+        GL_EXPR(glNamedBufferSubData(sky_view_buffer,0,sizeof(SkyViewParams),&sky_view_params));
+    }
+    GL_EXPR(glBindBufferBase(GL_UNIFORM_BUFFER,0,sky_view_buffer));
+    GL_EXPR(glBindTextureUnit(0,sky_lut));
+    GL_EXPR(glBindSampler(0,lut_sampler));
+    sky_shader->use();
+    GL_EXPR(glDrawArrays(GL_TRIANGLE_STRIP,0,4));
+}
+void ASRApplication::renderSunDisk(const vec3f &sun_dir, const vec3f &sun_radiance)
+{
+
+}
 void ASRApplication::render_frame()
 {
     GL_EXPR(glClearColor(0,0,0,0));
     GL_EXPR(glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT));
-    float sun_y_rad = deg2rad(sun_y_degree);
+    float sun_y_rad = deg2rad(-sun_y_degree);
     float sun_x_rad = deg2rad(sun_x_degree);
     float sun_dir_y = std::sin(sun_y_rad);
     float sun_dir_x = std::cos(sun_y_rad) * std::cos(sun_x_rad);
@@ -414,11 +519,18 @@ void ASRApplication::render_frame()
     auto proj = ortho(-10.f,10.f,-10.f,10.f,0.1f,80.f);
     auto vp = proj * view;
 
+    auto camera_view = camera->getViewMatrix();
+    auto camera_proj = perspective(deg2rad(camera->getZoom()),window_w * 1.f / window_h,0.1f,30.f);
+
+    updateFrustumDirs(inverse(camera_proj * camera_view));
+
     generateShadowMap(vp);
 
     generateSkyLUT(sun_dir,sun_radiance);
 
     generateAerialLUT(sun_dir,vp);
+
+    GL_EXPR(glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT));
 
     if(enable_terrain){
         renderMeshes(sun_dir,sun_radiance,vp);
@@ -429,18 +541,18 @@ void ASRApplication::render_frame()
     }
 
     if(enable_sun_disk){
-        renderSunDisk();
+        renderSunDisk(sun_dir,sun_radiance);
     }
 
 }
 void ASRApplication::render_imgui()
 {
     ImGui::Begin("Atmosphere Settings");
-
+    ImGui::Text("fps: %f",ImGui::GetIO().Framerate);
     if(ImGui::TreeNode("Sun")){
         ImGui::SliderFloat("Sun Angle X (Degree)",&sun_x_degree,0,360);
-        ImGui::SliderFloat("Sun Angle Y (Degree)",&sun_y_degree,-90,90);
-
+        ImGui::SliderFloat("Sun Angle Y (Degree)",&sun_y_degree,-10,90);
+        ImGui::SliderFloat("Sun Intensity",&sun_intensity,0,20);
 
         ImGui::TreePop();
     }

@@ -1,6 +1,6 @@
 #version 460 core
 
-layout(location = 0) in vec2 iFragCoord;
+layout(location = 0) in vec2 iFragTexCoord;
 
 layout(location = 0) out vec4 oFragColor;
 
@@ -50,6 +50,7 @@ void getSigmaST(float h,out vec3 sigma_s,out vec3 sigma_t){
     vec3 rayleigh = rayleigh_scattering * exp(-h / rayleigh_density_h);
     vec3 mie_s = vec3(mie_scattering) * exp(-h / mie_density_h);
     vec3 mie_t = vec3(mie_scattering + mie_absorption) * exp(-h / mie_density_h);
+    //d^{ozone}(h) = max(0,1 - frac{|h - 25|}{15})
     vec3 ozone = ozone_absorption * max(0.0,1 - abs(h - ozone_center_h) / (ozone_width * 0.5));
     sigma_s = rayleigh + mie_s;
     sigma_t = rayleigh + mie_t + ozone;
@@ -90,8 +91,9 @@ vec3 getMultiScattering(float h,float theta){
 }
 void main() {
     //non-linear mapping
-    float phi = 2 * PI * iFragCoord.x;
-    float vm = 2 * iFragCoord.y - 1;
+//    oFragColor = vec4(iFragTexCoord,0.5, 1);return;
+    float phi = 2 * PI * iFragTexCoord.x;
+    float vm = 2 * iFragTexCoord.y - 1;
     float theta = sign(vm) * (PI / 2) * vm * vm;
     float sin_theta = sin(theta);
     float cos_theta = cos(theta);
@@ -123,7 +125,6 @@ void main() {
         getSigmaST(ith_h,ith_sigma_s,ith_sigma_t);
 
         vec3 ith_transmittance = exp(-(sigam_t_sum + ith_sigma_t * half_dt));
-
 
         float sun_theta = PI / 2 - acos(dot(-sun_dir,normalize(ith_pos)));
         if(!hasIntersectionWithSphere(ith_pos,-sun_dir,ground_radius)){
