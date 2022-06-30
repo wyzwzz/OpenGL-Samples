@@ -90,8 +90,8 @@ void main() {
     vec3 albedo = vec3(0.03);//texture(AlbedoMap,iFragTexCoord).rgb;
 
     vec4 shadow_clip = shadow_vp * vec4(world_pos + 0.03 * normal,1);
-    vec2 shadow_ndc = shadow_clip.xy / shadow_clip.w;
-    vec2 shadow_uv = 0.5 + 0.5 * shadow_ndc;
+    vec3 shadow_ndc = shadow_clip.xyz / shadow_clip.w;
+    vec2 shadow_uv = 0.5 + 0.5 * shadow_ndc.xy;
 
     float shadow_factor = 1;
     if(all(equal(clamp(shadow_uv,vec2(0),vec2(1)), shadow_uv))){
