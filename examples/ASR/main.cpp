@@ -518,18 +518,7 @@ void ASRApplication::setupSkyView()
     sky_view_buffer = gl->CreateBuffer();
     GL_EXPR(glNamedBufferData(sky_view_buffer,sizeof(SkyViewParams),nullptr,GL_STATIC_DRAW));
 }
-std::vector<vec2f> createDiskVertices(int seg_count){
-    std::vector<vec2f> vertices;
-    constexpr float PI = pi<float>();
-    for(int i = 0; i < seg_count; ++i){
-        float phi0 = float(i) / seg_count * 2 * PI;
-        float phi1 = float(i + 1) / seg_count * 2 * PI;
-        vertices.emplace_back(0);
-        vertices.emplace_back(std::cos(phi0),std::sin(phi0));
-        vertices.emplace_back(std::cos(phi1),std::sin(phi1));
-    }
-    return vertices;
-}
+
 void ASRApplication::setupSunDisk()
 {
     if(!sun_shader){
@@ -566,6 +555,7 @@ void ASRApplication::generateSkyLUT(const vec3f& sun_dir,const vec3f& sun_radian
         sky_params.view_pos = camera->getCameraPos() * world_scale;
         sky_params.sun_dir = sun_dir;
         sky_params.sun_intensity = sun_radiance;
+        sky_params.enable_multiscattering = enalbe_multiscattering;
         GL_EXPR(glNamedBufferSubData(sky_buffer,0,sizeof(SkyParams),&sky_params));
     }
     GL_EXPR(glBindBufferBase(GL_UNIFORM_BUFFER,0,atmosphere_buffer));
@@ -761,6 +751,8 @@ void ASRApplication::render_imgui()
     ImGui::Checkbox("Enable Terrain",          &enable_terrain);
 
     ImGui::Text("fps: %f",ImGui::GetIO().Framerate);
+
+    ImGui::SetNextTreeNodeOpen(true);
     if(ImGui::TreeNode("Sun")){
         ImGui::SliderFloat("Sun Angle X (Degree)",&sun_x_degree,0,360);
         ImGui::SliderFloat("Sun Angle Y (Degree)",&sun_y_degree,-10,90);
@@ -768,12 +760,7 @@ void ASRApplication::render_imgui()
 
         ImGui::TreePop();
     }
-    ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Once);
-    if(ImGui::TreeNode("Sky LUT"))
-    {
 
-        ImGui::TreePop();
-    }
     ImGui::End();
 }
 void ASRApplication::process_input()
