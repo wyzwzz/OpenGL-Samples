@@ -22,3 +22,5 @@ add_subdirectory(ClusteredShading)
 add_subdirectory(ASR)
 
 add_subdirectory(VolumeCloud)
+
+add_subdirectory(ObjView)
