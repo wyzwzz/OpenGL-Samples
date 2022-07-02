@@ -295,7 +295,7 @@ void VolumeCloudApp::render_frame()
     GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,gbuffer.color,0));
     GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,gbuffer.depth,0));
     static GLenum mesh_draw_buffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1};
-    static constexpr float black[] = {0.f,0.f,0.f,0.f};
+    static constexpr unsigned char black[] = {54,87,135,0};
     static constexpr float red[] = {1.f};
     GL_EXPR(glClearTexImage(gbuffer.color,0,GL_RGBA,GL_UNSIGNED_BYTE,black));
     GL_EXPR(glClearTexImage(gbuffer.depth,0,GL_RED,GL_FLOAT,red));
