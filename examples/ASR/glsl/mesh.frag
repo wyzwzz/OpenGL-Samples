@@ -80,7 +80,7 @@ void main() {
     vec2 screen_coord = iScreenCoord.xy / iScreenCoord.w;
     screen_coord = 0.5 + screen_coord * vec2(0.5,-0.5);//ndc differ with image which start at left-up corner
 
-    float z = 0.9;//world_scale * distance(world_pos,view_pos) / max_aeraial_distance;
+    float z = world_scale * distance(world_pos,view_pos) / max_aeraial_distance;
     vec4 aerial_res = texture(AerialPerspective,vec3(screen_coord,z));
 //    oFragColor = vec4(screen_coord,z,1.0);return;
     vec3 in_scattering = aerial_res.rgb;
