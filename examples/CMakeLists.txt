@@ -20,3 +20,5 @@ add_subdirectory(CUDAGLVolumetricPathTracer)
 add_subdirectory(ClusteredShading)
 
 add_subdirectory(ASR)
+
+add_subdirectory(VolumeCloud)
