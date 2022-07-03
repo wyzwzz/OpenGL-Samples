@@ -51,35 +51,79 @@ float remap(float original_value, float original_min, float original_max, float 
 }
 
 float saturate(float x){
-    return clamp(x,0,1);
+    return clamp(x,0.0,1.0);
 }
-
+vec2 saturate(vec2 x){
+    return clamp(x,vec2(0.0),vec2(1.0));
+}
 vec3 saturate(vec3 x){
-    return clamp(x,vec3(0),vec3(1));
+    return clamp(x,vec3(0.0),vec3(1.0));
 }
+#define sampleDensity sampleDensity1
 const float shape_tiling = 1;
-float sampleDensity(vec3 pos){
+float sampleDensity0(vec3 pos){
     vec3 box_size = box_max - box_min;
     vec3 box_center = 0.5 * (box_min + box_max);
-    vec2 uv = (pos.xz - box_min.xz) / box_size.xz;
+    vec2 uv = saturate((pos.xz - box_min.xz) / box_size.xz);
     float weather = texture(WeatherMap,uv).r;
     float height_percent = saturate((pos.y - box_min.y) / box_size.y);
     float g_min = remap((1 - weather) * weather, 0, 1, 0.1, 0.6);
     float g_max = remap(weather, 0, 1, g_min, 0.9);
     float height_gradient1 = saturate(remap(height_percent,0.0,g_min,0,1)) * saturate(remap(height_percent,1,g_max,0,1));
-    float height_gradient2 = saturate(remap(height_percent,0.0,weather,1.0,0.0))
+    float height_gradient2 = min(weather,saturate(remap(height_percent,0.0,weather,1.0,0.0)))
     * saturate(remap(height_percent,g_min,1,0,1));
     float height_gradient = saturate(mix(height_gradient1,height_gradient2,0.5));
+//
+    const float containerEdgeFadeDst = 4;
+    float dstFromEdgeX = min(containerEdgeFadeDst, min(pos.x - box_min.x, box_max.x - pos.x));
+    float dstFromEdgeZ = min(containerEdgeFadeDst, min(pos.z - box_min.z, box_max.z - pos.z));
+    float edgeWeight = min(dstFromEdgeZ, dstFromEdgeX) / containerEdgeFadeDst;
+//
+    height_gradient2 *= edgeWeight;
 
-    const float containerEdgeFadeDst = 5;
+//    vec3 uvw = pos * shape_tiling;
+    float base_desnity = texture(ShapeNoise,pos * 0.52).r;
+
+    return   height_gradient * texture(ShapeNoise,pos * 0.52).r ;//* 0.25;//height_gradient;// * texture(ShapeNoise,uvw).r;
+}
+const float g_c = 0.8;
+const float g_d = 1;
+
+float sampleDensity1(vec3 pos){
+    vec3 box_size = box_max - box_min;
+    vec3 box_center = 0.5 * (box_min + box_max);
+    vec2 uv = saturate((pos.xz - box_min.xz) / box_size.xz);
+
+    const float containerEdgeFadeDst = 3;
     float dstFromEdgeX = min(containerEdgeFadeDst, min(pos.x - box_min.x, box_max.x - pos.x));
     float dstFromEdgeZ = min(containerEdgeFadeDst, min(pos.z - box_min.z, box_max.z - pos.z));
     float edgeWeight = min(dstFromEdgeZ, dstFromEdgeX) / containerEdgeFadeDst;
 
-    height_gradient *= edgeWeight;
+    float wd = texture(WeatherMap,uv).r;
 
-    vec3 uvw = pos * shape_tiling;
-    return  height_gradient * texture(ShapeNoise,uvw).r * 0.25;//height_gradient;// * texture(ShapeNoise,uvw).r;
+    const float wc0 = 0.8;
+    const float wc1 = 0.9;
+    const float WMc = max(wc0,saturate(g_c - 0.5) * wc1 * 2);
+    float ph = saturate((pos.y - box_min.y) / box_size.y);
+    const float wh = 0.8;
+
+    float SRb = saturate(remap(ph,0,0.07,0,1));
+    float SRt = saturate(remap(ph,wh*0.2,wh,1,0));
+    float SA = SRb * SRt;
+
+    float DRb = ph * saturate(remap(ph,0,0.15,0,1));
+    float DRt = saturate(remap(ph,0.9,1.0,1,0));
+    float DA = g_d * DRb * DRt * wd * 2;
+
+    float SN = texture(ShapeNoise,pos * 0.1).r;
+
+    SN = remap(SN * SA,1 - g_c * WMc,1, 0, 1) * DA * edgeWeight;
+
+    float DN_fbm = texture(DetailNoise,pos * 0.22).r;
+    float DN_mod = 0.35 * exp(-g_c * 0.75) * mix(DN_fbm,1 - DN_fbm,saturate(ph * 5));
+
+    float d = saturate(remap(SN,DN_mod,1,0,1));
+    return d;
 }
 
 const float density_to_sigma_t = 1;//0.15;
@@ -109,24 +153,24 @@ vec3 evalPhaseFunction(float u){
 
     vec3 pRayleigh = vec3(abs(3 / (16 * PI) * (1 + u2)));
 
-    return (pMie * 0.5 + pRayleigh * 0.5) * 0.9 + 0.1;
+    return (pMie * 0.5 + pRayleigh * 0.5) * 0.8 + 0.2;
 }
 
 vec3 densityToSigmaS(float density){
-    return vec3(0.75) * density;
+    return vec3(1) * density;
 }
 const vec2 ScreenUV = vec2(1920.0/512,1080/512);
 vec3 cloudRayMarching(vec3 start_pos,vec3 ray_dir,float max_ray_advance_dist,vec3 in_radiance){
 
     if(max_ray_advance_dist < 0.001) return in_radiance;
 
-    int ray_marching_step_count = 512;
+    int ray_marching_step_count = 64;
     float sum_sigma_t = 0;
-    float dt = 0.1;//max_ray_advance_dist / ray_marching_step_count;
+    float dt = 18.0 / 64;//max_ray_advance_dist / ray_marching_step_count;
     vec3 sum_radiance = vec3(0);
 
     float blue_noise = texture(BlueNoise,iUV).r;
-    float travel_dist = dt * blue_noise * 0.2;
+    float travel_dist = dt * blue_noise ;
     for(int i = 0; i < ray_marching_step_count; ++i){
         if(travel_dist > max_ray_advance_dist) break;
         vec3 ith_pos = start_pos + travel_dist * ray_dir;
@@ -138,13 +182,35 @@ vec3 cloudRayMarching(vec3 start_pos,vec3 ray_dir,float max_ray_advance_dist,vec
         vec3 rho = evalPhaseFunction(dot(LightDir,-ray_dir));
         vec3 ith_transmittance = vec3(exp(-sum_sigma_t));
         sum_radiance += ith_single_scattering * sigma_s * rho *  ith_transmittance * dt;
-        if( all( lessThan( ith_transmittance,vec3(0.11) ) ) )
+        if( all( lessThan( ith_transmittance,vec3(0.01) ) ) )
             break;
         travel_dist += dt;
     }
     sum_radiance += in_radiance * exp(-sum_sigma_t);
 //    sum_radiance +=  1 - exp(-sum_sigma_t);
     return sum_radiance;
+}
+vec4 cloudRawCast(vec3 start_pos,vec3 ray_dir,float max_ray_advance_dist){
+    int ray_cast_step_count = 512;
+    float step = 18.0 / 500;
+    float advanced_dist = texture(BlueNoise,iUV).r * step;
+    vec4 color = vec4(0.0,0.0,0.0,0.0);
+
+    for(int i = 0; i < ray_cast_step_count; ++i){
+
+        vec3 ith_pos = start_pos + (advanced_dist + 0.5 * step) * ray_dir;
+
+        float density = sampleDensity(ith_pos);
+
+        vec4 denisty_color = vec4(density);
+
+        color = color + denisty_color * vec4(density,density,density,1.0) * (1.0 - color.a);
+        if(color.w > 0.99)
+            break;
+        advanced_dist += step;
+        if(advanced_dist >= max_ray_advance_dist) break;
+    }
+    return color;
 }
 
 void main() {
@@ -161,11 +227,12 @@ void main() {
     //intersect with box
     if(intersect_t.y > 0 && intersect_t.y > intersect_t.x){
         float cam_to_box_dist = max(0,intersect_t.x);
-        float ray_box_dist = intersect_t.y - intersect_t.x;
+        float ray_box_dist = intersect_t.y - max(0,intersect_t.x);
         float ray_advance_dist = min(ray_box_dist,max(0,cam_to_pos_dist - cam_to_box_dist));
         vec3 radiance = cloudRayMarching(camera_pos + cam_to_box_dist * view_dir,view_dir,ray_advance_dist,color);
 //        vec3 radiance = vec3( (camera_pos + cam_to_box_dist * view_dir)/ 20);
-        cloud = radiance;
+//        vec4 radiance = cloudRawCast(camera_pos + cam_to_box_dist * view_dir, view_dir,ray_advance_dist);
+        cloud = mix(color,radiance.rgb,1);
     }
     else{
         cloud = color;

@@ -236,6 +236,8 @@ void VolumeCloudApp::initResource()
     GL_EXPR(glSamplerParameteri(cloud.shape_sampler,GL_TEXTURE_MIN_FILTER,GL_LINEAR));
     GL_EXPR(glSamplerParameteri(cloud.shape_sampler,GL_TEXTURE_MAG_FILTER,GL_LINEAR));
 
+    cloud.detail = gl->CreateTexture(GL_TEXTURE_3D);
+    LoadTexture3DFromRaw("noiseErosionPacked_32_32_32.raw",32,32,32,cloud.detail);
     cloud.detail_sampler = gl->CreateSampler();
     GL_EXPR(glSamplerParameteri(cloud.detail_sampler,GL_TEXTURE_WRAP_S,GL_REPEAT));
     GL_EXPR(glSamplerParameteri(cloud.detail_sampler,GL_TEXTURE_WRAP_T,GL_REPEAT));
@@ -295,7 +297,7 @@ void VolumeCloudApp::render_frame()
     GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,gbuffer.color,0));
     GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,gbuffer.depth,0));
     static GLenum mesh_draw_buffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1};
-    static constexpr unsigned char black[] = {54,87,135,0};
+    static constexpr unsigned char black[] = {65,95,155,0};
     static constexpr float red[] = {1.f};
     GL_EXPR(glClearTexImage(gbuffer.color,0,GL_RGBA,GL_UNSIGNED_BYTE,black));
     GL_EXPR(glClearTexImage(gbuffer.depth,0,GL_RED,GL_FLOAT,red));
@@ -309,18 +311,19 @@ void VolumeCloudApp::render_frame()
     cloud_shader->setMat4("InvProj",inverse(camera_proj));
     cloud_shader->setVec3("CameraPos",camera->getCameraPos());
     cloud_shader->setVec3("LightDir", normalize(vec3(0,-0.5,0.5)));
-    cloud_shader->setVec3("LightRadiance",10.f,10.f,10.f);
+    cloud_shader->setVec3("LightRadiance",6.f,6.f,6.f);
 
     GL_EXPR(glBindTextureUnit(0,gbuffer.depth));
     GL_EXPR(glBindTextureUnit(1,gbuffer.color));
     GL_EXPR(glBindTextureUnit(2,cloud.weather_map));
     GL_EXPR(glBindTextureUnit(3,cloud.shape));
-//    GL_EXPR(glBindTextureUnit(4,cloud.detail));
+    GL_EXPR(glBindTextureUnit(4,cloud.detail));
     GL_EXPR(glBindTextureUnit(5,cloud.blue_noise));
     GL_EXPR(glBindSampler(0,nearest_sampler));
     GL_EXPR(glBindSampler(1,nearest_sampler));
     GL_EXPR(glBindSampler(2,linear_sampler));
     GL_EXPR(glBindSampler(3,cloud.shape_sampler));
+    GL_EXPR(glBindSampler(4,cloud.detail_sampler));
     GL_EXPR(glBindSampler(5,nearest_sampler));
     GL_EXPR(glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,clound_tex,0));
     GL_EXPR(glDrawBuffer(GL_COLOR_ATTACHMENT0));

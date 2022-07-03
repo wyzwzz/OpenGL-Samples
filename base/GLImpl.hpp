@@ -29,7 +29,7 @@ class GLFWImpl : public EventListenerTraits
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_DOUBLEBUFFER, true);
 
-        auto pWin = glfwCreateWindow(1902, 1080, "OpenGL-Window", nullptr, nullptr);
+        auto pWin = glfwCreateWindow(960, 540, "OpenGL-Window", nullptr, nullptr);
         if (pWin == nullptr)
         {
             throw std::runtime_error("Failed to create GLFW window");
