@@ -80,7 +80,7 @@ void main() {
     vec2 screen_coord = iScreenCoord.xy / iScreenCoord.w;
     screen_coord = 0.5 + screen_coord * vec2(0.5,-0.5);//ndc differ with image which start at left-up corner
 
-    float z = 0.9;//world_scale * distance(world_pos,view_pos) / max_aeraial_distance;
+    float z = world_scale * distance(world_pos,view_pos) / max_aeraial_distance;
     vec4 aerial_res = texture(AerialPerspective,vec3(screen_coord,z));
 //    oFragColor = vec4(screen_coord,z,1.0);return;
     vec3 in_scattering = aerial_res.rgb;
@@ -90,8 +90,8 @@ void main() {
     vec3 albedo = vec3(0.03);//texture(AlbedoMap,iFragTexCoord).rgb;
 
     vec4 shadow_clip = shadow_vp * vec4(world_pos + 0.03 * normal,1);
-    vec2 shadow_ndc = shadow_clip.xy / shadow_clip.w;
-    vec2 shadow_uv = 0.5 + 0.5 * shadow_ndc;
+    vec3 shadow_ndc = shadow_clip.xyz / shadow_clip.w;
+    vec2 shadow_uv = 0.5 + 0.5 * shadow_ndc.xy;
 
     float shadow_factor = 1;
     if(all(equal(clamp(shadow_uv,vec2(0),vec2(1)), shadow_uv))){

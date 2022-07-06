@@ -142,8 +142,8 @@ void main() {
             if(!hasIntersectionWithSphere(ith_pos,-sun_dir,ground_radius)){
                 vec3 shadow_pos = view_pos + view_dir * mid_t / world_scale;
                 vec4 shadow_clip_pos = shadow_vp * vec4(shadow_pos, 1.0);
-                vec2 shadow_ndc = shadow_clip_pos.xy / shadow_clip_pos.w;
-                vec2 shadow_uv = shadow_ndc * 0.5 + 0.5;
+                vec3 shadow_ndc = shadow_clip_pos.xyz / shadow_clip_pos.w;
+                vec2 shadow_uv = shadow_ndc.xy * 0.5 + 0.5;
 
                 bool in_shadow = bool(enable_shadow);
                 if(bool(enable_shadow) && all(equal(clamp(shadow_uv,vec2(0),vec2(1)),shadow_uv))){
