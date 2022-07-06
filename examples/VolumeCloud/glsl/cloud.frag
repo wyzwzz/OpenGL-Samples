@@ -39,6 +39,7 @@ vec2 rayIntersectBox(vec3 box_min,vec3 box_max,vec3 ray_origin,vec3 inv_ray_dir)
     float exit_t  = min(min(t_max.x,t_max.y),t_max.z);
     return vec2(enter_t,exit_t);//exit_t > enter_t && exit_t > 0
 }
+
 //const vec3 box_min = vec3(-2,4,-2);
 //const vec3 box_max = vec3(2,6,2);
 
@@ -53,14 +54,19 @@ float remap(float original_value, float original_min, float original_max, float 
 float saturate(float x){
     return clamp(x,0.0,1.0);
 }
+
 vec2 saturate(vec2 x){
     return clamp(x,vec2(0.0),vec2(1.0));
 }
+
 vec3 saturate(vec3 x){
     return clamp(x,vec3(0.0),vec3(1.0));
 }
 #define sampleDensity sampleDensity1
+
+
 const float shape_tiling = 1;
+
 float sampleDensity0(vec3 pos){
     vec3 box_size = box_max - box_min;
     vec3 box_center = 0.5 * (box_min + box_max);
@@ -73,7 +79,7 @@ float sampleDensity0(vec3 pos){
     float height_gradient2 = min(weather,saturate(remap(height_percent,0.0,weather,1.0,0.0)))
     * saturate(remap(height_percent,g_min,1,0,1));
     float height_gradient = saturate(mix(height_gradient1,height_gradient2,0.5));
-//
+
     const float containerEdgeFadeDst = 4;
     float dstFromEdgeX = min(containerEdgeFadeDst, min(pos.x - box_min.x, box_max.x - pos.x));
     float dstFromEdgeZ = min(containerEdgeFadeDst, min(pos.z - box_min.z, box_max.z - pos.z));
@@ -86,6 +92,10 @@ float sampleDensity0(vec3 pos){
 
     return   height_gradient * texture(ShapeNoise,pos * 0.52).r ;//* 0.25;//height_gradient;// * texture(ShapeNoise,uvw).r;
 }
+
+
+
+
 const float g_c = 0.8;
 const float g_d = 1;
 
